@@ -234,6 +234,17 @@
                 <div class="btn-group" style="margin-bottom:8px;">
                     <button class="mode-btn" id="btn-bind-vfx" style="background:#9c27b0; padding:12px 0; font-size:14px; font-weight:bold; color:white;">☄️ 在当前帧绑定选中粒子</button>
                 </div>
+                <!-- 🌟 新增的循环与延迟控制面板 -->
+                <div class="control-group" style="background:#1a1a1a; padding:8px; border-radius:4px; border:1px solid #444; margin-bottom:8px;">
+                    <div style="display:flex; align-items:center; gap:5px; margin-bottom:5px;">
+                        <input type="checkbox" id="chk-bind-loop" checked style="cursor:pointer; width:14px; height:14px;">
+                        <label for="chk-bind-loop" style="cursor:pointer; margin:0; font-size:12px;">绑定后无限循环</label>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="margin:0; font-size:12px; color:#aaa;">延迟播放 (帧)</label>
+                        <input type="number" id="input-bind-delay" value="0" min="0" step="1" style="width:60px; background:#222; color:#fff; border:1px solid #444; border-radius:4px; padding:2px 5px;">
+                    </div>
+                </div>
                 <div class="btn-group" style="margin-bottom:8px;">
                     <button class="mode-btn" id="btn-export-anim" style="background:#ff9800; padding:10px 0;">📤 仅导出动画</button>
                     <button class="mode-btn" id="btn-import-anim" style="background:#2196f3; padding:10px 0;">📥 仅导入动画</button>
@@ -906,7 +917,9 @@
                 // 🌟 接口开放 2：读取 JSON 里的独立重力
                 gravity: config.physics?.gravity !== undefined ? config.physics.gravity : particleGravity,
                 colStart: colStart, colEnd: colEnd,
-                assetName: config.name || "未知特效"
+                assetName: config.name || "未知特效",
+                originalSpeed: config.physics?.speed || 5.0,   
+                originalSpread: config.physics?.spread || 1.0
             };
         }
 
@@ -1585,6 +1598,7 @@
             }
             controls.update();
 
+            // 🌟 实时物理引擎，保持原有动感
             activeParticleInstances.forEach(sys => {
                 sys.life += 0.016;
                 
@@ -1596,11 +1610,20 @@
                 const colors = sys.mesh.geometry.attributes.color.array;
                 let progress = Math.min(sys.life / sys.maxLife, 1.0);
 
-                // 🌟 循环逻辑判断
                 if (sys.life > sys.maxLife) {
-                    if (particleLoop) {
+                    if (sys.mesh.userData.shouldLoop !== false && particleLoop) {
                         sys.life = 0;
-                        for (let i = 0; i < positions.length / 3; i++) { positions[i * 3] = 0; positions[i * 3 + 1] = 0; positions[i * 3 + 2] = 0; }
+                        for (let i = 0; i < positions.length / 3; i++) { 
+                            positions[i * 3] = 0; positions[i * 3 + 1] = 0; positions[i * 3 + 2] = 0; 
+                            if (sys.velocities[i] && sys.originalSpeed !== undefined) {
+                                const angle = Math.random() * Math.PI * 2;
+                                sys.velocities[i].set(
+                                    Math.cos(angle) * Math.random() * sys.originalSpread,
+                                    Math.random() * sys.originalSpeed,
+                                    Math.sin(angle) * Math.random() * sys.originalSpread
+                                );
+                            }
+                        }
                     } else {
                         sys.mesh.visible = false;
                         return;
@@ -1782,6 +1805,14 @@
         const kfMenu = document.getElementById('kf-menu');
         function showKfMenu(e, frame, data, isAudio) {
             activeKeyframeMenuData = { frame, data, isAudio };
+            
+            // 🌟 长按判断：如果这一帧绑了粒子，就把循环和延迟同步显示出来
+            if (data && data.vfx && data.vfx.length > 0) {
+                const vfx = data.vfx[0];
+                document.getElementById('chk-bind-loop').checked = vfx.loop !== false;
+                document.getElementById('input-bind-delay').value = vfx.delay || 0;
+            }
+            
             let x = e.clientX || (e.touches && e.touches[0].clientX); let y = e.clientY || (e.touches && e.touches[0].clientY);
             kfMenu.style.display = 'flex'; kfMenu.style.left = `${x}px`; kfMenu.style.top = `${y}px`;
             if (y > window.innerHeight - 200) kfMenu.style.top = `${y - 200}px`;
@@ -1849,14 +1880,19 @@
             const frameData = nodeData.get(currentFrame);
             if (!frameData.vfx) frameData.vfx = [];
 
+            const isLoop = document.getElementById('chk-bind-loop').checked;
+            const delayFrames = parseInt(document.getElementById('input-bind-delay').value) || 0;
+
             frameData.vfx = [{
                 assetName: selectedVfxAsset.name,
                 offset: [0, 0, 0],
                 scale: [1, 1, 1],
-                once: true
+                loop: isLoop,       // 🌟 专属循环
+                delay: delayFrames, // 🌟 专属延迟
+                startFrame: currentFrame // 🌟 记录绑定帧
             }];
 
-            statusText.innerText = `✅ 绑定成功: [${selectedVfxAsset.name}] -> 帧 ${currentFrame}`;
+            statusText.innerText = `✅ 绑定成功: [${selectedVfxAsset.name}] -> 帧 ${currentFrame} (延迟:${delayFrames}帧)`;
             document.getElementById('anim-status').innerText = `✅ 第 ${currentFrame} 帧已挂载特效`;
             renderKeyframes();
         };
@@ -1881,16 +1917,26 @@
             const asset = loadedParticleAssets.find(a => a.name === vfxDesc.assetName);
             if (!asset) { console.warn('未找到粒子模板:', vfxDesc.assetName); return; }
 
-            const tempConfig = JSON.parse(JSON.stringify(asset.config));
-            if(tempConfig.physics) {
-                tempConfig.physics.speed = 0.5; 
+            // 🌟 延迟处理
+            if (vfxDesc.delay && vfxDesc.delay > 0) {
+                setTimeout(() => {
+                    if (!isPlaying && currentFrame < vfxDesc.startFrame) return; 
+                    createAndAddVfxInstance(locator, asset, vfxDesc);
+                }, (vfxDesc.delay / 20) * 1000);
+            } else {
+                createAndAddVfxInstance(locator, asset, vfxDesc);
             }
+        }
 
+        function createAndAddVfxInstance(locator, asset, vfxDesc) {
+            const tempConfig = JSON.parse(JSON.stringify(asset.config));
             const instData = createParticleMesh(tempConfig, asset.texture);
             instData.mesh.userData.isVfxMesh = true;
             instData.mesh.userData.isEventVfx = true; 
             instData.mesh.userData.vfxName = asset.name;
             instData.mesh.userData.parentLocName = locator.name;
+            // 🌟 读取专属循环标记
+            instData.mesh.userData.shouldLoop = vfxDesc.loop !== false; 
 
             const offset = vfxDesc.offset || [0, 0, 0];
             const scl = vfxDesc.scale || [1, 1, 1];
@@ -2312,7 +2358,8 @@
             document.getElementById('render-text').innerText = '正在初始化 MP4 编码器...';
             document.getElementById('btn-cancel-render').onclick = () => { cancelRender = true; };
 
-            isPlaying = false; document.getElementById('btn-play-anim').innerText = '▶ 播放';
+            // 🌟 关键修复：这里必须设为 true，否则绑定定位器的粒子根本不会生成！
+            isPlaying = true; 
             isRenderingVideo = true; cancelRender = false;
 
             const outWidth = 1280; const outHeight = 720; const fps = 30; 
@@ -2339,7 +2386,110 @@
                     document.getElementById('render-bar').style.width = `${progress}%`;
                     document.getElementById('render-text').innerText = `正在渲染并压缩: ${frame} / ${totalFrames}`;
 
+                    // applyAnimationState 会因为在播放状态，去触发 triggerLocatorVfx 生成粒子！
                     applyAnimationState(animFrame);
+
+                    // 🌟 修复：导出时同步推进天气系统（雨/雪），防止暂停
+                    if (globalWeatherSystem) {
+                        const wsys = globalWeatherSystem;
+                        const wpos = wsys.mesh.geometry.attributes.position.array;
+                        wsys.mesh.position.x = camera.position.x;
+                        wsys.mesh.position.z = camera.position.z;
+                        wsys.mesh.updateMatrixWorld(true);
+                        const dtW = 1.0 / fps;
+                        const halfRange = wsys.range * 0.5;
+                        for (let i = 0; i < wpos.length / 3; i++) {
+                            const i3 = i * 3;
+                            let x = wpos[i3]     + wsys.velocities[i].x * dtW;
+                            let y = wpos[i3 + 1] + wsys.velocities[i].y * dtW;
+                            let z = wpos[i3 + 2] + wsys.velocities[i].z * dtW;
+                            if (x >  halfRange) x -= wsys.range; else if (x < -halfRange) x += wsys.range;
+                            if (z >  halfRange) z -= wsys.range; else if (z < -halfRange) z += wsys.range;
+                            if (y < -10) {
+                                y = wsys.height + (Math.random() - 0.5) * 2;
+                                x = (Math.random() - 0.5) * wsys.range;
+                                z = (Math.random() - 0.5) * wsys.range;
+                            }
+                            wpos[i3] = x; wpos[i3 + 1] = y; wpos[i3 + 2] = z;
+                        }
+                        wsys.mesh.geometry.attributes.position.needsUpdate = true;
+                    }
+
+                    // 🌟 核心修复：导出时强制手动更新粒子，防止暂停
+activeParticleInstances.forEach(sys => {
+    
+    // 👇 新增这一段：不在绑定的时间段内就隐藏，防止无限循环！
+    if (sys.mesh && sys.mesh.userData.isEventVfx) {
+        let isTimeToShow = false;
+        const locName = sys.mesh.userData.parentLocName;
+        if (locName) {
+            const key = `locator_${locName}`;
+            if (animationData.has(key)) {
+                const nodeData = animationData.get(key);
+                const fd = nodeData.get(animFrame); 
+                // 检查当前帧是否挂载了这个粒子
+                if (fd && fd.vfx && fd.vfx.some(v => v.assetName === sys.mesh.userData.vfxName)) {
+                    isTimeToShow = true;
+                }
+            }
+        }
+        if (!isTimeToShow) {
+            sys.mesh.visible = false;
+        }
+    }
+    // 👆 新增结束
+
+    sys.life += (1.0 / fps);
+
+                        const positions = sys.mesh.geometry.attributes.position.array;
+                        const colors = sys.mesh.geometry.attributes.color.array;
+                        let progress2 = Math.min(sys.life / sys.maxLife, 1.0);
+
+                        if (sys.life > sys.maxLife) {
+                            if (sys.mesh.userData.shouldLoop !== false && particleLoop) {
+                                sys.life = 0;
+                                for (let i = 0; i < positions.length / 3; i++) { 
+                                    positions[i * 3] = 0; positions[i * 3 + 1] = 0; positions[i * 3 + 2] = 0; 
+                                    if (sys.velocities[i] && sys.originalSpeed !== undefined) {
+                                        const angle = Math.random() * Math.PI * 2;
+                                        sys.velocities[i].set(
+                                            Math.cos(angle) * Math.random() * sys.originalSpread,
+                                            Math.random() * sys.originalSpeed,
+                                            Math.sin(angle) * Math.random() * sys.originalSpread
+                                        );
+                                    }
+                                }
+                            } else {
+                                sys.mesh.visible = false;
+                            }
+                        } else {
+                            for (let i = 0; i < positions.length / 3; i++) {
+                                positions[i * 3] += sys.velocities[i].x * (1.0 / fps);
+                                positions[i * 3 + 1] += sys.velocities[i].y * (1.0 / fps);
+                                positions[i * 3 + 2] += sys.velocities[i].z * (1.0 / fps);
+                                
+                                sys.velocities[i].y += sys.gravity * (1.0 / fps);
+                                
+                                if (sys.wind) {
+                                    sys.velocities[i].x += sys.wind.x * (1.0 / fps);
+                                    sys.velocities[i].y += sys.wind.y * (1.0 / fps);
+                                    sys.velocities[i].z += sys.wind.z * (1.0 / fps);
+                                }
+                                
+                                sys.velocities[i].x *= sys.drag;
+                                sys.velocities[i].z *= sys.drag;
+
+                                if (sys.colStart && sys.colEnd) {
+                                    colors[i * 3] = THREE.MathUtils.lerp(sys.colStart.r, sys.colEnd.r, progress2);
+                                    colors[i * 3 + 1] = THREE.MathUtils.lerp(sys.colStart.g, sys.colEnd.g, progress2);
+                                    colors[i * 3 + 2] = THREE.MathUtils.lerp(sys.colStart.b, sys.colEnd.b, progress2);
+                                }
+                            }
+                            sys.mesh.geometry.attributes.color.needsUpdate = true;
+                        }
+                        sys.mesh.geometry.attributes.position.needsUpdate = true;
+                        if (sys.mesh) sys.mesh.visible = true;
+                    });
                     
                     if (isInsideCamera && sceneCamera) {
                         sceneCamera.aspect = outWidth / outHeight; sceneCamera.updateProjectionMatrix(); composer.passes[0].camera = sceneCamera;
@@ -2389,7 +2539,7 @@
             } catch (err) {
                 console.error(err); alert("视频导出中断: " + err.message); document.getElementById('render-modal').style.display = 'none';
             } finally {
-                isRenderingVideo = false; applyAnimationState(currentFrame); window.addEventListener('resize', onWindowResize); setTimeout(onWindowResize, 100);
+                isRenderingVideo = false; isPlaying = false; applyAnimationState(currentFrame); window.addEventListener('resize', onWindowResize); setTimeout(onWindowResize, 100);
             }
         });
 
