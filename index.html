@@ -65,6 +65,7 @@
         .keyframe { width: 12px; height: 12px; background: #4caf50; position: absolute; top: 14px; transform: translateX(-50%) rotate(45deg); cursor: pointer; border: 1px solid #000; z-index: 5; }
         .keyframe:hover { background: #fff; transform: translateX(-50%) rotate(45deg) scale(1.2); }
         .keyframe.smooth-kf { border-radius: 50%; transform: translateX(-50%); background: #00e5ff;}
+        .keyframe.has-vfx { background: #ff00ff; box-shadow: 0 0 10px #ff00ff; border-radius: 50%; transform: translateX(-50%) scale(1.3); }
         #playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #ff5252; z-index: 10; pointer-events: none; box-shadow: 0 0 5px #ff5252; }
         #playhead::before { content: ''; position: absolute; top: 0; left: -4px; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid #ff5252; }
         #kf-menu { display: none; position: absolute; background: #222; border: 1px solid #444; border-radius: 4px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.8); flex-direction: column; padding: 5px 0; }
@@ -73,7 +74,6 @@
         #kf-menu .danger { color: #ff5252; }
         #anim-io-hint { font-size: 11px; color: #ffaa00; text-align: center; margin-bottom: 5px; }
         
-        /* 视频渲染弹窗 */
         #render-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; align-items: center; justify-content: center; flex-direction: column; }
         #render-box { background: #111; padding: 25px; border-radius: 12px; border: 1px solid #444; text-align: center; width: 320px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         #render-progress { width: 100%; height: 12px; background: #333; border-radius: 6px; margin: 20px 0 10px; overflow: hidden; }
@@ -97,8 +97,8 @@
             </div>
 
             <div class="btn-group" style="margin-bottom:10px;">
-                <button class="mode-btn" id="btn-export-project" style="background:#0055aa;">📦 导出项目</button>
-                <button class="mode-btn" id="btn-import-project" style="background:#4caf50;">📂 导入项目</button>
+                <button class="mode-btn" id="btn-export-project" style="background:#0055aa;">📦 导出工程配置 (.es3d)</button>
+                <button class="mode-btn" id="btn-import-project" style="background:#4caf50;">📂 读取工程配置</button>
             </div>
             <input type="file" id="project-input" accept=".es3d" style="display: none;">
             <div id="project-status" style="font-size:11px; color:#ffaa00; text-align:center; margin-bottom:5px;"></div>
@@ -106,6 +106,7 @@
             <div class="btn-group">
                 <button class="mode-btn active" id="btn-mode-render">渲染模式</button>
                 <button class="mode-btn" id="btn-mode-anim">动画模式</button>
+                <button class="mode-btn" id="btn-mode-edit">编辑模式</button>
             </div>
 
             <div id="render-panels">
@@ -140,6 +141,47 @@
                         <div class="control-group"><label><span>色散强度 (RGB Shift)</span> <span id="val-rgb">0.0</span></label><input type="range" id="slider-rgb" min="0" max="5" step="0.1" value="0.0"></div>
                         <div class="control-group"><label><span>鱼眼镜头 (Fisheye)</span> <span id="val-fish">0.0</span></label><input type="range" id="slider-fish" min="0" max="2" step="0.1" value="0.0"></div>
                         <div class="control-group"><label><span>画面锐化 (Sharpen)</span> <span id="val-sharp">0.0</span></label><input type="range" id="slider-sharp" min="0" max="2" step="0.1" value="0.0"></div>
+                    </div>
+                </details>
+
+                <details open>
+                    <summary>✨ 粒子与特效系统</summary>
+                    <div class="details-content">
+                        <div class="btn-group" style="margin-bottom:8px;">
+                            <button class="mode-btn" id="btn-load-espart" style="background:#2196f3;">📦 导入 .espart 包</button>
+                            <button class="mode-btn" id="btn-save-espart" style="background:#4caf50;">💾 导出当前为包</button>
+                        </div>
+                        <input type="file" id="espart-input" accept=".espart,.zip" style="display:none;">
+
+                        <div class="btn-group" style="margin-bottom:8px;">
+                            <button class="mode-btn" id="btn-add-fire" style="background:#ff5722;">🔥 火焰</button>
+                            <button class="mode-btn" id="btn-add-explosion" style="background:#e91e63;">💥 爆炸</button>
+                        </div>
+
+                        <hr style="border-color:#333; margin:10px 0;">
+                        <div style="font-size:12px; color:#00e5ff; margin-bottom:5px; font-weight:bold;">全局气象 (环境粒子)</div>
+                        <div class="btn-group" style="margin-bottom:8px;">
+                            <button class="mode-btn" id="btn-weather-rain" style="background:#333;">🌧️ 下雨</button>
+                            <button class="mode-btn" id="btn-weather-snow" style="background:#333;">❄️ 下雪</button>
+                            <button class="mode-btn" id="btn-weather-off" style="background:#444;">🌤️ 晴朗</button>
+                        </div>
+
+                        <div class="control-group">
+                            <label><span>重力影响 (Gravity)</span> <span id="val-part-gravity">-9.8</span></label>
+                            <input type="range" id="slider-part-gravity" min="-20" max="20" step="0.5" value="-9.8">
+                        </div>
+                        <div class="control-group">
+                            <label><span>粒子大小 (Size)</span> <span id="val-part-size">0.5</span></label>
+                            <input type="range" id="slider-part-size" min="0.05" max="3" step="0.05" value="0.5">
+                        </div>
+                        <div class="control-group">
+                            <label><span>全局拖尾强度 (Trail)</span> <span id="val-part-trail">1.0</span></label>
+                            <input type="range" id="slider-part-trail" min="1" max="5" step="0.1" value="1.0">
+                        </div>
+                        
+                        <div class="btn-group" style="margin-top:10px;">
+                            <button class="mode-btn" id="btn-clear-particles" style="background:#444;">🗑️ 清除所有特效</button>
+                        </div>
                     </div>
                 </details>
 
@@ -188,15 +230,23 @@
                 <div class="btn-group" style="margin-bottom:8px;">
                     <button class="mode-btn" id="btn-add-kf" style="background:#0055aa; padding:12px 0; font-size:14px;">➕ 记录当前骨骼/摄像机关键帧</button>
                 </div>
+                <!-- 🌟 极简绑定按钮 -->
                 <div class="btn-group" style="margin-bottom:8px;">
-                    <button class="mode-btn" id="btn-export-anim" style="background:#ff9800; padding:10px 0;">📤 导出动画</button>
-                    <button class="mode-btn" id="btn-import-anim" style="background:#2196f3; padding:10px 0;">📥 一键导入动画</button>
+                    <button class="mode-btn" id="btn-bind-vfx" style="background:#9c27b0; padding:12px 0; font-size:14px; font-weight:bold; color:white;">☄️ 在当前帧绑定选中粒子</button>
+                </div>
+                <div class="btn-group" style="margin-bottom:8px;">
+                    <button class="mode-btn" id="btn-export-anim" style="background:#ff9800; padding:10px 0;">📤 仅导出动画</button>
+                    <button class="mode-btn" id="btn-import-anim" style="background:#2196f3; padding:10px 0;">📥 仅导入动画</button>
                 </div>
                 <div class="btn-group" style="margin-bottom:8px;">
                     <button class="mode-btn" id="btn-export-video" style="background:#e91e63; padding:12px 0; font-size:14px;">🎬 逐帧渲染视频 (MP4)</button>
                 </div>
                 <input type="file" id="anim-input" accept=".esanim" style="display:none;">
                 <div id="anim-io-hint">提示：一键导入会自动按模型名或选中状态分配动作</div>
+            </div>
+
+            <div id="edit-controls" style="display: none; margin-top:20px;">
+                <div id="anim-io-hint">提示：编辑模式默认启用光影模式查看 PBR 效果。<br>右侧材质栏中<b>长按贴图</b>打开材质编辑器。</div>
             </div>
 
             <div id="status">就绪</div>
@@ -213,6 +263,10 @@
                         <button class="mode-btn" id="btn-toggle-skeleton">隐藏/显示骨骼</button>
                     </div>
                     
+                    <div class="btn-group" style="margin-top:10px;">
+                        <button class="mode-btn" id="btn-add-locator" style="background:#ff9800; color:white; font-weight:bold;">📍 在选中骨骼添加定位器</button>
+                    </div>
+
                     <div class="control-group" style="margin-top:10px; border-top: 1px dashed #444; padding-top: 10px;">
                         <label><span>回弹插值阈值 (帧)</span> <span id="val-bounce-threshold">6</span></label>
                         <input type="range" id="slider-bounce-threshold" min="1" max="30" step="1" value="6">
@@ -233,8 +287,14 @@
         </div>
 
         <div id="outliner-panel">
-            <div id="outliner-header"><span>场景大纲</span></div>
-            <div id="outliner-content"><span style="color:#555;">请先导入模型...</span></div>
+            <div id="outliner-header">
+                <span id="panel-title">场景大纲</span>
+                <span style="font-size:10px; color:#666;" id="panel-mode-hint">大纲模式</span>
+            </div>
+            <div id="outliner-content">
+                <div id="tree-view"><span style="color:#555;">请先导入模型...</span></div>
+                <div id="texture-view" style="display:none;"></div>
+            </div>
         </div>
 
         <button id="toggle-outliner-btn">📑 切换大纲</button>
@@ -283,7 +343,66 @@
         </div>
     </div>
 
-    <input type="file" id="audio-input" accept=".mp3,.m4a,.ogg" style="display:none;">
+    <div id="texture-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; align-items: center; justify-content: center; flex-direction: column;">
+        <div style="background: #111; padding: 20px; border-radius: 12px; border: 1px solid #444; width: 340px; max-height: 90vh; overflow-y:auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8);">
+            <h3 style="margin-top:0; color:#00e5ff; border-bottom: 1px solid #333; padding-bottom: 10px;">🎨 材质编辑器</h3>
+            <div id="edit-texture-name" style="font-size:12px; color:#fff; margin-bottom:10px; word-break:break-all;">-</div>
+
+            <details open>
+                <summary>发光遮罩 (Emissive)</summary>
+                <div class="details-content">
+                    <div style="display:flex; gap:5px; margin-bottom:5px;">
+                        <button class="mode-btn" id="btn-replace-emissive" style="background:#333;">💡 替换发光遮罩图</button>
+                        <button class="mode-btn" id="btn-clear-emissive" style="background:#444; flex:0 0 60px;">清除</button>
+                    </div>
+                    <input type="file" id="emissive-map-input" accept="image/*" style="display:none;">
+                    <div style="font-size:10px; color:#888; margin-bottom:8px;">遮罩规则：黑色=不发光，灰色=微亮，白色=超亮。发光颜色自动跟随主纹理。</div>
+                    <div class="control-group">
+                        <label><span>发光强度倍率</span> <span id="val-tex-emissive-int">1.0</span></label>
+                        <input type="range" id="tex-emissive-int" min="0" max="5" step="0.1" value="1">
+                    </div>
+                </div>
+            </details>
+
+            <details open style="margin-top:10px;">
+                <summary>法线贴图 (Normal)</summary>
+                <div class="details-content">
+                    <div style="display:flex; gap:5px; margin-bottom:5px;">
+                        <button class="mode-btn" id="btn-replace-normal" style="background:#333;">⛰️ 替换法线贴图</button>
+                        <button class="mode-btn" id="btn-clear-normal" style="background:#444; flex:0 0 60px;">清除</button>
+                    </div>
+                    <input type="file" id="normal-map-input" accept="image/*" style="display:none;">
+                    <div class="control-group">
+                        <label><span>法线强度 (Bump Scale)</span> <span id="val-tex-normal-scale">1.0</span></label>
+                        <input type="range" id="tex-normal-scale" min="0" max="3" step="0.1" value="1">
+                    </div>
+                </div>
+            </details>
+
+            <details open style="margin-top:10px;">
+                <summary>色彩与透明度</summary>
+                <div class="details-content">
+                    <div class="control-group"><label><span>透明度</span> <span id="val-tex-opa">1.0</span></label><input type="range" id="tex-opa" min="0" max="1" step="0.05" value="1"></div>
+                    <div class="control-group"><label><span>饱和度</span> <span id="val-tex-sat">1.0</span></label><input type="range" id="tex-sat" min="0" max="2" step="0.05" value="1"></div>
+                    <div class="control-group"><label><span>对比度</span> <span id="val-tex-con">1.0</span></label><input type="range" id="tex-con" min="0" max="2" step="0.05" value="1"></div>
+                    <div class="control-group" style="border-top: 1px dashed #444; padding-top: 8px; margin-top: 8px;">
+                        <label><span>金属度 (Metalness)</span> <span id="val-tex-metal">0.0</span></label>
+                        <input type="range" id="tex-metal" min="0" max="1" step="0.05" value="0">
+                        <div style="font-size:10px; color:#888; margin-top:2px;">0 为非金属（塑料/皮肤），1 为纯金属（钢铁）</div>
+                    </div>
+                    <div class="control-group">
+                        <label><span>粗糙度 (Roughness)</span> <span id="val-tex-rough">0.5</span></label>
+                        <input type="range" id="tex-rough" min="0" max="1" step="0.05" value="0.5">
+                        <div style="font-size:10px; color:#888; margin-top:2px;">0 为镜面反光，1 为绝对哑光（岩石/布料）</div>
+                    </div>
+                </div>
+            </details>
+
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button id="btn-close-tex" style="flex:1; background:#444; color:white; padding:10px; border:none; border-radius:6px; cursor:pointer;">关闭</button>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@4.3.0/build/mp4-muxer.min.js"></script>
@@ -302,7 +421,7 @@
         let cancelRender = false;
         let isPortraitPreview = false;
         let bounceThreshold = 6; 
-        let bounceStrength = 1.7; // 新增：回弹强度变量
+        let bounceStrength = 1.7; 
 
         const FXShader = {
             uniforms: {
@@ -373,7 +492,10 @@
 
         const transformControls = new TransformControls(camera, renderer.domElement);
         transformControls.setSize(0.8); scene.add(transformControls);
-        transformControls.addEventListener('dragging-changed', function (event) { controls.enabled = !event.value; });
+        
+        transformControls.addEventListener('dragging-changed', function (event) { 
+            controls.enabled = !event.value; 
+        });
 
         let loadedModels = []; let sceneLights = []; let selectedNode = null; let selectedLight = null;
         let boneVisuals = []; let showSkeleton = true; let isLitMode = false; 
@@ -381,10 +503,28 @@
         const originalMaterialsMap = new Map(); const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2();
         let isDragging = false; 
 
-        let isAnimMode = false; let currentFrame = 0; const maxFrames = 100; let lastMaxKeyframe = 0; let isPlaying = false; let playStartTime = 0;
+        let isAnimMode = false; let currentFrame = 0; let lastMaxKeyframe = 0; let isPlaying = false; let playStartTime = 0;
         let animationData = new Map(); 
         const tickWidth = 40; 
         let activeKeyframeMenuData = null;
+
+        const pbrMaterialMap = new Map();
+        const textureRegistry = new Map();
+        let activeEditTexture = null;
+        let isEditMode = false;
+
+        // 🌟 粒子与特效系统全局变量
+        let loadedParticleAssets = []; 
+        let activeParticleInstances = []; 
+        let particleGravity = -9.8;
+        let particleSize = 0.5;
+        let particleTrail = 1.0;
+        let particleLoop = true; // 🌟 循环开关
+        let globalWeatherSystem = null; 
+
+        // 🌟 大纲里当前选中的粒子模板（用于绑定）
+        let selectedVfxAsset = null; 
+        let activeLocatorVfx = []; 
 
         const timelineScrollArea = document.getElementById('timeline-scroll-area');
         const timelineTracksContainer = document.getElementById('timeline-tracks-container');
@@ -395,7 +535,7 @@
         function refreshModelBoneList(model) {
             if (!model || !model.group) return;
             const list = [];
-            model.group.traverse(c => { if (c.isBone) list.push(c); });
+            model.group.traverse(c => { if (c.isBone || c.userData.isLocator) list.push(c); });
             modelBoneLists.set(model, list);
             return list;
         }
@@ -412,6 +552,7 @@
 
         function getAnimKey(node) {
             if (node.isCamera) return `camera_${node.id}`;
+            if (node.userData && node.userData.isLocator) return `locator_${node.name}`;
             let model = null;
             loadedModels.forEach(m => {
                 if (!model) {
@@ -421,7 +562,11 @@
                 }
             });
             if (!model) return null;
-            const idx = getBoneIndex(model, node);
+            let idx = getBoneIndex(model, node);
+            if (idx < 0) {
+                refreshModelBoneList(model);
+                idx = getBoneIndex(model, node);
+            }
             if (idx < 0) return null;
             return `${model.id}::bone:${idx}`;
         }
@@ -554,51 +699,1004 @@
             if (val === 0) { scene.fog = null; } else { scene.fog = new THREE.FogExp2(scene.background instanceof THREE.Color ? scene.background.getHex() : 0x0a0a0a, val); }
         });
 
-        document.getElementById('btn-mode-render').onclick = () => {
-            isAnimMode = false; 
-            document.getElementById('btn-mode-render').classList.add('active'); document.getElementById('btn-mode-anim').classList.remove('active');
-            document.getElementById('render-panels').style.display = 'block'; document.getElementById('anim-controls').style.display = 'none'; document.getElementById('timeline-panel').style.display = 'none';
+        function setMode(mode) {
+            isAnimMode = (mode === 'anim');
+            isEditMode = (mode === 'edit');
+
+            document.getElementById('btn-mode-render').classList.toggle('active', mode === 'render');
+            document.getElementById('btn-mode-anim').classList.toggle('active', mode === 'anim');
+            document.getElementById('btn-mode-edit').classList.toggle('active', mode === 'edit');
+
+            document.getElementById('render-panels').style.display = (mode === 'render') ? 'block' : 'none';
+            document.getElementById('anim-controls').style.display = (mode === 'anim') ? 'block' : 'none';
+            document.getElementById('timeline-panel').style.display = (mode === 'anim') ? 'flex' : 'none';
+            document.getElementById('edit-controls').style.display = (mode === 'edit') ? 'block' : 'none';
+
+            const title = document.getElementById('panel-title');
+            const hint = document.getElementById('panel-mode-hint');
+
+            if (mode === 'edit') {
+                if (!isLitMode) setRenderMode(true);
+                title.innerText = '材质资源管理器';
+                hint.innerText = '编辑模式';
+                document.getElementById('tree-view').style.display = 'none';
+                document.getElementById('texture-view').style.display = 'block';
+                buildTextureList();
+            } else {
+                title.innerText = '场景大纲';
+                hint.innerText = (mode === 'anim') ? '动画模式' : '渲染模式';
+                document.getElementById('tree-view').style.display = 'block';
+                document.getElementById('texture-view').style.display = 'none';
+                buildOutliner();
+            }
+
             setTimeout(onWindowResize, 100);
-            if(selectedNode) applyAnimationState(currentFrame);
-        };
-        
-        document.getElementById('btn-mode-anim').onclick = () => {
-            isAnimMode = true; 
-            document.getElementById('btn-mode-anim').classList.add('active'); document.getElementById('btn-mode-render').classList.remove('active');
-            document.getElementById('render-panels').style.display = 'none'; document.getElementById('anim-controls').style.display = 'block'; document.getElementById('timeline-panel').style.display = 'flex';
-            setTimeout(onWindowResize, 100);
-            renderKeyframes();
-            updateAnimButtons();
+            if (mode === 'render' && selectedNode) applyAnimationState(currentFrame);
+            if (mode === 'anim') renderKeyframes();
+        }
+
+        document.getElementById('btn-mode-render').onclick = () => setMode('render');
+        document.getElementById('btn-mode-anim').onclick = () => setMode('anim');
+        document.getElementById('btn-mode-edit').onclick = () => setMode('edit');
+
+        // ==================== 程序化生成高级贴图 (无需外部上传) ====================
+        function generateParticleTexture(type) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            if (type === 'fire') {
+                const gradient = ctx.createRadialGradient(64, 80, 0, 64, 80, 64);
+                gradient.addColorStop(0, 'rgba(255,255,255,1)');
+                gradient.addColorStop(0.4, 'rgba(255,200,50,0.8)');
+                gradient.addColorStop(1, 'rgba(255,0,0,0)');
+                ctx.fillStyle = gradient;
+                ctx.beginPath(); ctx.arc(64, 64, 64, 0, Math.PI * 2); ctx.fill();
+            } else if (type === 'explosion') {
+                ctx.translate(64, 64); ctx.fillStyle = 'white'; ctx.beginPath();
+                for (let i = 0; i < 8; i++) { ctx.rotate(Math.PI / 4); ctx.moveTo(0, 0); ctx.lineTo(64, 10); ctx.lineTo(64, -10); }
+                ctx.fill();
+            } else {
+                const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+                gradient.addColorStop(0, 'rgba(255,255,255,1)');
+                gradient.addColorStop(1, 'rgba(255,255,255,0)');
+                ctx.fillStyle = gradient; ctx.fillRect(0, 0, 128, 128);
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            return tex;
+        }
+
+        const defaultFireTex = generateParticleTexture('fire');
+        const defaultExplosionTex = generateParticleTexture('explosion');
+        const defaultDotTex = generateParticleTexture('dot');
+
+        // ==================== 粒子与特效系统 ====================
+        document.getElementById('slider-part-gravity').addEventListener('input', (e) => {
+            particleGravity = parseFloat(e.target.value);
+            document.getElementById('val-part-gravity').innerText = particleGravity;
+        });
+
+        document.getElementById('slider-part-size').addEventListener('input', (e) => {
+            particleSize = parseFloat(e.target.value);
+            document.getElementById('val-part-size').innerText = particleSize;
+            activeParticleInstances.forEach(inst => {
+                if(inst.mesh) inst.mesh.material.size = particleSize * 10; // 补偿缩放
+            });
+        });
+
+        document.getElementById('slider-part-trail').addEventListener('input', (e) => {
+            particleTrail = parseFloat(e.target.value);
+            document.getElementById('val-part-trail').innerText = particleTrail;
+            activeParticleInstances.forEach(inst => {
+                if(inst.mesh && inst.mesh.material.userData.trailLength) {
+                    inst.mesh.material.userData.trailLength.value = particleTrail;
+                }
+            });
+        });
+
+        function createParticleMesh(config, texture) {
+            const count = config.quantity || 300;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const velocities = [];
+            const colors = new Float32Array(count * 3);
+            
+            const colStart = new THREE.Color(config.colorStart || "#ffffff");
+            const colEnd = new THREE.Color(config.colorEnd || "#ffffff");
+            const speed = config.physics?.speed || 5.0;
+            const spread = config.physics?.spread || 1.0;
+            const isExplode = config.explode || false;
+
+            for (let i = 0; i < count; i++) {
+                positions[i * 3] = 0; positions[i * 3 + 1] = 0; positions[i * 3 + 2] = 0;
+
+                if (isExplode) {
+                    velocities.push(new THREE.Vector3(
+                        (Math.random() - 0.5) * speed * 2,
+                        (Math.random() - 0.5) * speed * 2,
+                        (Math.random() - 0.5) * speed * 2
+                    ));
+                } else {
+                    const angle = Math.random() * Math.PI * 2;
+                    velocities.push(new THREE.Vector3(
+                        Math.cos(angle) * Math.random() * spread,
+                        Math.random() * speed,
+                        Math.sin(angle) * Math.random() * spread
+                    ));
+                }
+                colors[i * 3] = colStart.r; colors[i * 3 + 1] = colStart.g; colors[i * 3 + 2] = colStart.b;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            let blendMode = THREE.AdditiveBlending;
+            if (config.renderMode === "normal" || config.renderMode === "blend") blendMode = THREE.NormalBlending;
+
+            const material = new THREE.PointsMaterial({
+                size: particleSize * 10, 
+                sizeAttenuation: false,  
+                map: texture || defaultDotTex,
+                vertexColors: true,
+                transparent: true,       
+                opacity: 1.0,
+                alphaTest: 0.01,         
+                blending: blendMode,
+                depthWrite: false,       // 🌟 防穿帮核心：关闭深度写入
+                depthTest: true          // 🌟 防穿帮核心：恢复深度测试，该被遮挡就被遮挡
+            });
+
+            // 处理拖尾和 UV 图集
+            const uvGrid = texture.userData.uvGrid || [1, 1];
+            material.userData.trailLength = { value: particleTrail };
+            material.userData.uvGrid = { value: new THREE.Vector2(uvGrid[0], uvGrid[1]) };
+            material.userData.uvTime = { value: 0.0 };
+
+            material.onBeforeCompile = function(shader) {
+                shader.uniforms.u_trail = material.userData.trailLength;
+                shader.uniforms.u_uvGrid = material.userData.uvGrid;
+                shader.uniforms.u_uvTime = material.userData.uvTime;
+
+                shader.vertexShader = shader.vertexShader.replace(
+                    '#include <project_vertex>',
+                    `
+                    vec4 mvPosition = vec4( transformed, 1.0 );
+                    #ifdef USE_INSTANCING
+                        mvPosition = instanceMatrix * mvPosition;
+                    #endif
+                    mvPosition = modelViewMatrix * mvPosition;
+                    gl_Position = projectionMatrix * mvPosition;
+                    gl_PointSize = size; 
+                    `
+                );
+
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    /uniform sampler2D map;/,
+                    `
+                    uniform sampler2D map;
+                    uniform vec2 u_uvGrid;
+                    uniform float u_uvTime;
+                    `
+                );
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    '#include <map_fragment>',
+                    `
+                    #ifdef USE_MAP
+                        vec2 grid = u_uvGrid;
+                        float totalFrames = grid.x * grid.y;
+                        float frameIndex = mod(floor(u_uvTime * 15.0), totalFrames);
+                        float col = mod(frameIndex, grid.x);
+                        float row = floor(frameIndex / grid.x);
+                        vec2 uvOffset = vec2(col / grid.x, 1.0 - (row + 1.0) / grid.y);
+                        vec2 uvScale = vec2(1.0 / grid.x, 1.0 / grid.y);
+                        vec2 animatedUv = vUv * uvScale + uvOffset;
+                        vec4 sampledDiffuseColor = texture2D( map, animatedUv );
+                        diffuseColor *= sampledDiffuseColor;
+                    #endif
+                    `
+                );
+            };
+
+            const mesh = new THREE.Points(geometry, material);
+            
+            return { 
+                mesh, velocities, life: 0, maxLife: config.lifetime || 2.0, 
+                wind: new THREE.Vector3(config.physics?.wind?.[0]||0, config.physics?.wind?.[1]||0, config.physics?.wind?.[2]||0),
+                drag: config.physics?.drag !== undefined ? config.physics.drag : 0.98,
+                // 🌟 接口开放 2：读取 JSON 里的独立重力
+                gravity: config.physics?.gravity !== undefined ? config.physics.gravity : particleGravity,
+                colStart: colStart, colEnd: colEnd,
+                assetName: config.name || "未知特效"
+            };
+        }
+
+        // 🌟 放置粒子到场景（支持作为独立实体，或者绑定到骨骼）
+        function placeParticleInstance(asset, bindToNode = null) {
+            if (!asset.meshInstance) {
+                const instData = createParticleMesh(asset.config, asset.texture);
+                instData.mesh.userData.isVfxMesh = true;
+                instData.mesh.userData.vfxName = asset.name;
+                instData.mesh.position.set(0, 3, 0);
+                
+                if (bindToNode) {
+                    bindToNode.add(instData.mesh);
+                } else {
+                    scene.add(instData.mesh);
+                }
+                
+                activeParticleInstances.push(instData);
+                asset.meshInstance = instData.mesh;
+                statusText.innerText = bindToNode ? `特效已挂载到 ${bindToNode.name}` : `已放置粒子: ${asset.name}`;
+            }
+            buildOutliner();
+        }
+
+        // 🌟 解析 .espart 包（超强容错版）
+        document.getElementById('espart-input').addEventListener('change', async (e) => {
+            const file = e.target.files[0]; if (!file) return;
+            statusText.innerText = "正在解析 .espart 资源包...";
+            const zip = new JSZip();
+            try {
+                const zipContent = await zip.loadAsync(file);
+                
+                let jsonPath = null;
+                for (let path in zipContent.files) {
+                    if (!zipContent.files[path].dir && path.endsWith('.json')) {
+                        jsonPath = path;
+                        break;
+                    }
+                }
+                if (!jsonPath) throw new Error("压缩包内未找到任何 .json 配置文件！");
+                const data = JSON.parse(await zipContent.file(jsonPath).async("string"));
+
+                let imgPath = null;
+                // 🌟 优先读取 JSON 里指定的贴图路径
+                if (data.texture && zipContent.file(data.texture)) {
+                    imgPath = data.texture;
+                } else {
+                    // 如果没写或者写错了，再暴力搜索
+                    for (let path in zipContent.files) {
+                        if (!zipContent.files[path].dir && (path.endsWith('.png') || path.endsWith('.jpg'))) {
+                            imgPath = path;
+                            break;
+                        }
+                    }
+                }
+                if (!imgPath) throw new Error("压缩包内未找到贴图 (.png/.jpg)！");
+                
+                const imgBlob = await zipContent.file(imgPath).async("blob");
+                const imgUrl = URL.createObjectURL(imgBlob);
+                const tex = await new Promise(resolve => {
+                    new THREE.TextureLoader().load(imgUrl, t => { 
+                        t.colorSpace = THREE.SRGBColorSpace; 
+                        t.userData.uvGrid = (data.uv && data.uv.length === 2) ? data.uv : [1, 1];
+                        resolve(t); 
+                    });
+                });
+
+                const asset = { name: data.name || "未命名粒子", config: data, texture: tex, meshInstance: null };
+                loadedParticleAssets.push(asset);
+                selectedVfxAsset = asset; 
+                
+                placeParticleInstance(asset);
+                
+                statusText.innerText = `成功载入并放置: ${asset.name}`;
+                alert(`🎉 成功解析粒子包！\n\n抓到的 JSON: ${jsonPath}\n抓到的贴图: ${imgPath}\n\n粒子已生成，请在大纲查看。`);
+            } catch (err) { 
+                console.error(err);
+                alert("解析失败: " + err.message); 
+            }
+            e.target.value = '';
+        });
+
+        document.getElementById('btn-load-espart').onclick = () => {
+            document.getElementById('espart-input').click();
         };
 
-        transformControls.addEventListener('objectChange', () => {
-            if (isAnimMode && selectedNode && (selectedNode.isBone || selectedNode.isCamera)) {
-                recordKeyframe(selectedNode, currentFrame, false);
+        document.getElementById('btn-add-fire').onclick = () => {
+            // 🌟 火煋：向四周散开，负重力往下掉
+            const fireConfig = { 
+                name: "火煋", 
+                quantity: 400, 
+                lifetime: 1.5, 
+                size: 0.3, 
+                explode: false, 
+                physics: { 
+                    speed: 6.0,      // 往外冲
+                    spread: 3.0,     // 散开更宽
+                    drag: 0.96,      // 空气阻力
+                    gravity: -9.8,   // 往下掉
+                    wind: [0, 0, 0]  // 无风
+                }, 
+                colorStart: "#ffdd55", 
+                colorEnd: "#ff0000",
+                renderMode: "normal"
+            };
+            const asset = { name: "火煋", config: fireConfig, texture: defaultFireTex, meshInstance: null };
+            loadedParticleAssets.push(asset);
+            selectedVfxAsset = asset; 
+            placeParticleInstance(asset); 
+        };
+
+        document.getElementById('btn-add-explosion').onclick = () => {
+            const expConfig = { name: "爆炸", quantity: 800, lifetime: 1.5, explode: true, physics: { speed: 15, spread: 1, drag: 0.9 }, colorStart: "#ffff00", colorEnd: "#ff0000" };
+            const asset = { name: "内置爆炸", config: expConfig, texture: defaultExplosionTex, meshInstance: null };
+            loadedParticleAssets.push(asset);
+            selectedVfxAsset = asset; 
+            placeParticleInstance(asset); 
+        };
+
+        document.getElementById('btn-clear-particles').onclick = () => {
+            activeParticleInstances.forEach(inst => { 
+                if (inst.mesh.parent) inst.mesh.parent.remove(inst.mesh);
+                inst.mesh.geometry.dispose(); inst.mesh.material.dispose(); 
+            });
+            activeParticleInstances = []; loadedParticleAssets = []; selectedVfxAsset = null; buildOutliner(); statusText.innerText = "场景内所有粒子已清空";
+        };
+
+        // 天气系统
+        function setWeather(type) {
+            if (globalWeatherSystem) { scene.remove(globalWeatherSystem.mesh); globalWeatherSystem.mesh.geometry.dispose(); globalWeatherSystem.mesh.material.dispose(); globalWeatherSystem = null; }
+            if (type === 'off') { statusText.innerText = "天气晴朗"; return; }
+            
+            const isRain = type === 'rain';
+            const count = isRain ? 3000 : 1500;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const velocities = [];
+            const range = 100, height = 80;
+
+            for (let i = 0; i < count; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * range; positions[i * 3 + 1] = Math.random() * height; positions[i * 3 + 2] = (Math.random() - 0.5) * range;
+                velocities.push(isRain ? new THREE.Vector3(1.0, -40.0, 1.0) : new THREE.Vector3((Math.random() - 0.5) * 2, -5.0 - Math.random() * 3, (Math.random() - 0.5) * 2));
             }
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const material = new THREE.PointsMaterial({ color: isRain ? 0x88aaff : 0xffffff, size: isRain ? 0.8 : 1.5, transparent: true, opacity: isRain ? 0.6 : 0.8, depthWrite: false, map: defaultDotTex });
+            const mesh = new THREE.Points(geometry, material); mesh.position.copy(camera.position); scene.add(mesh);
+            globalWeatherSystem = { mesh, velocities, range, height };
+            statusText.innerText = `天气: ${isRain ? '下雨' : '下雪'}`;
+        }
+        document.getElementById('btn-weather-rain').onclick = () => setWeather('rain');
+        document.getElementById('btn-weather-snow').onclick = () => setWeather('snow');
+        document.getElementById('btn-weather-off').onclick = () => setWeather('off');
+
+
+        function registerModelTextures(group, modelName) {
+            group.traverse(c => {
+                if (c.isMesh && c.material) {
+                    const mats = Array.isArray(c.material) ? c.material : [c.material];
+                    const hasTangent = !!c.geometry.attributes.tangent;
+                    mats.forEach(mat => {
+                        if (mat.userData.isProxy) return;
+                        mat.userData.useFallbackTangent = !hasTangent;
+                        if (mat.map) {
+                            const tex = mat.map;
+                            if (!textureRegistry.has(tex.uuid)) textureRegistry.set(tex.uuid, { uuid: tex.uuid, name: `${tex.name || '默认贴图'}_${modelName}`, texture: tex, materials: [] });
+                            const texData = textureRegistry.get(tex.uuid);
+                            if (!texData.materials.includes(mat)) texData.materials.push(mat);
+                            if (!mat.userData.customUniforms) {
+                                mat.userData.customUniforms = { u_saturation: { value: 1.0 }, u_contrast: { value: 1.0 }, u_emissiveIntensity: { value: 1.0 } };
+                                const originalCompile = mat.onBeforeCompile;
+                                mat.onBeforeCompile = function(shader) {
+                                    if (originalCompile) originalCompile.call(this, shader);
+                                    shader.uniforms.u_saturation = mat.userData.customUniforms.u_saturation;
+                                    shader.uniforms.u_contrast = mat.userData.customUniforms.u_contrast;
+                                    shader.uniforms.u_emissiveIntensity = mat.userData.customUniforms.u_emissiveIntensity;
+                                    shader.uniforms.u_useFallback = { value: mat.userData.useFallbackTangent ? 1.0 : 0.0 };
+
+                                    shader.fragmentShader = shader.fragmentShader.replace(/void\s+main\s*\(\s*\)\s*\{/, `uniform float u_saturation;\nuniform float u_contrast;\nuniform float u_emissiveIntensity;\nuniform float u_useFallback;\nvoid main() {`);
+                                    shader.fragmentShader = shader.fragmentShader.replace('#include <dithering_fragment>', `#include <dithering_fragment>\nfloat gray = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114));\ngl_FragColor.rgb = mix(vec3(gray), gl_FragColor.rgb, u_saturation);\ngl_FragColor.rgb = (gl_FragColor.rgb - 0.5) * u_contrast + 0.5;`);
+                                    shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#ifdef USE_EMISSIVEMAP\nvec4 emissiveMaskColor = texture2D( emissiveMap, vEmissiveMapUv );\nfloat maskLum = dot(emissiveMaskColor.rgb, vec3(0.299, 0.587, 0.114));\nvec3 baseColor = vec3(1.0);\n#ifdef USE_MAP\nbaseColor = texture2D( map, vMapUv ).rgb;\n#endif\ntotalEmissiveRadiance = baseColor * maskLum * u_emissiveIntensity;\n#endif`);
+                                    shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `#ifdef USE_NORMALMAP\nvec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;\nmapN.xy *= normalScale;\nif (u_useFallback > 0.5) {\nvec3 q0 = dFdx( vViewPosition ); vec3 q1 = dFdy( vViewPosition );\nvec2 st0 = dFdx( vNormalMapUv.st ); vec2 st1 = dFdy( vNormalMapUv.st );\nvec3 N = normalize( vNormal );\nvec3 q1perp = cross( q1, N ); vec3 q0perp = cross( N, q0 );\nvec3 T = q1perp * st0.x + q0perp * st1.x;\nvec3 B = q1perp * st0.y + q0perp * st1.y;\nfloat det = max( dot( T, T ), dot( B, B ) );\nfloat scale = ( det == 0.0 ) ? 0.0 : inversesqrt( det );\nT *= scale; B *= scale;\nnormal = normalize( T * mapN.x + B * mapN.y + N * mapN.z );\n} else { normal = normalize( tbn * mapN ); }\n#endif`);
+                                };
+                                mat.needsUpdate = true;
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        function buildTextureList() {
+            const container = document.getElementById('texture-view'); container.innerHTML = '';
+            if (textureRegistry.size === 0) { container.innerHTML = '<span style="color:#555;">当前场景没有可编辑的贴图</span>'; return; }
+            textureRegistry.forEach((data, uuid) => {
+                const div = document.createElement('div'); div.className = 'list-item';
+                const img = document.createElement('img'); img.src = data.texture.image ? (data.texture.image.src || '') : ''; img.style.width = '24px'; img.style.height = '24px'; img.style.objectFit = 'cover'; img.style.marginRight = '8px'; img.style.borderRadius = '3px'; div.appendChild(img);
+                const text = document.createElement('span'); text.innerText = data.name; text.style.flex = '1'; text.style.overflow = 'hidden'; text.style.textOverflow = 'ellipsis'; div.appendChild(text);
+                let pressTimer; div.onmousedown = div.ontouchstart = () => { pressTimer = setTimeout(() => openTextureEditor(uuid), 600); }; div.onmouseup = div.ontouchend = div.onmouseleave = () => clearTimeout(pressTimer);
+                container.appendChild(div);
+            });
+        }
+
+        function openTextureEditor(uuid) {
+            const data = textureRegistry.get(uuid); if (!data) return;
+            activeEditTexture = data;
+            document.getElementById('edit-texture-name').innerText = `当前编辑: ${data.name}`;
+            document.getElementById('texture-modal').style.display = 'flex';
+            if (data.materials.length > 0) {
+                const firstMat = data.materials[0];
+                document.getElementById('tex-opa').value = firstMat.opacity !== undefined ? firstMat.opacity : 1;
+                document.getElementById('val-tex-opa').innerText = parseFloat(document.getElementById('tex-opa').value).toFixed(2);
+                if (firstMat.userData.customUniforms) {
+                    document.getElementById('tex-sat').value = firstMat.userData.customUniforms.u_saturation.value;
+                    document.getElementById('val-tex-sat').innerText = parseFloat(document.getElementById('tex-sat').value).toFixed(2);
+                    document.getElementById('tex-con').value = firstMat.userData.customUniforms.u_contrast.value;
+                    document.getElementById('val-tex-con').innerText = parseFloat(document.getElementById('tex-con').value).toFixed(2);
+                    document.getElementById('tex-emissive-int').value = firstMat.userData.customUniforms.u_emissiveIntensity.value;
+                    document.getElementById('val-tex-emissive-int').innerText = parseFloat(document.getElementById('tex-emissive-int').value).toFixed(1);
+                }
+                if (firstMat.normalScale) {
+                    document.getElementById('tex-normal-scale').value = firstMat.normalScale.x;
+                    document.getElementById('val-tex-normal-scale').innerText = firstMat.normalScale.x.toFixed(1);
+                } else { document.getElementById('tex-normal-scale').value = 1; document.getElementById('val-tex-normal-scale').innerText = "1.0"; }
+                document.getElementById('tex-metal').value = firstMat.metalness !== undefined ? firstMat.metalness : 0;
+                document.getElementById('val-tex-metal').innerText = parseFloat(document.getElementById('tex-metal').value).toFixed(2);
+                document.getElementById('tex-rough').value = firstMat.roughness !== undefined ? firstMat.roughness : 0.5;
+                document.getElementById('val-tex-rough').innerText = parseFloat(document.getElementById('tex-rough').value).toFixed(2);
+            }
+        }
+
+        document.getElementById('btn-close-tex').onclick = () => { document.getElementById('texture-modal').style.display = 'none'; activeEditTexture = null; };
+        document.getElementById('tex-opa').addEventListener('input', (e) => {
+            if (!activeEditTexture) return; const val = parseFloat(e.target.value); document.getElementById('val-tex-opa').innerText = val.toFixed(2);
+            activeEditTexture.materials.forEach(mat => { mat.transparent = val < 1.0; mat.opacity = val; mat.needsUpdate = true; }); refreshAllProxies();
+        });
+        document.getElementById('tex-sat').addEventListener('input', (e) => { if (!activeEditTexture) return; const val = parseFloat(e.target.value); document.getElementById('val-tex-sat').innerText = val.toFixed(2); activeEditTexture.materials.forEach(mat => { if(mat.userData.customUniforms) mat.userData.customUniforms.u_saturation.value = val; }); });
+        document.getElementById('tex-con').addEventListener('input', (e) => { if (!activeEditTexture) return; const val = parseFloat(e.target.value); document.getElementById('val-tex-con').innerText = val.toFixed(2); activeEditTexture.materials.forEach(mat => { if(mat.userData.customUniforms) mat.userData.customUniforms.u_contrast.value = val; }); });
+        document.getElementById('tex-emissive-int').addEventListener('input', (e) => { if (!activeEditTexture) return; const val = parseFloat(e.target.value); document.getElementById('val-tex-emissive-int').innerText = val.toFixed(1); activeEditTexture.materials.forEach(mat => { if(mat.userData.customUniforms) mat.userData.customUniforms.u_emissiveIntensity.value = val; }); });
+        document.getElementById('tex-metal').addEventListener('input', (e) => { if (!activeEditTexture) return; const val = parseFloat(e.target.value); document.getElementById('val-tex-metal').innerText = val.toFixed(2); activeEditTexture.materials.forEach(mat => { mat.metalness = val; mat.needsUpdate = true; }); });
+        document.getElementById('tex-rough').addEventListener('input', (e) => { if (!activeEditTexture) return; const val = parseFloat(e.target.value); document.getElementById('val-tex-rough').innerText = val.toFixed(2); activeEditTexture.materials.forEach(mat => { mat.roughness = val; mat.needsUpdate = true; }); });
+
+        document.getElementById('btn-replace-emissive').onclick = () => document.getElementById('emissive-map-input').click();
+        document.getElementById('emissive-map-input').addEventListener('change', (e) => {
+            const file = e.target.files[0]; if (!file || !activeEditTexture) return;
+            new THREE.TextureLoader().load(URL.createObjectURL(file), (texture) => {
+                texture.colorSpace = THREE.SRGBColorSpace; texture.needsUpdate = true;
+                activeEditTexture.materials.forEach(mat => {
+                    if (mat.emissiveMap && mat.emissiveMap.dispose) { try { mat.emissiveMap.dispose(); } catch(e){} }
+                    mat.emissiveMap = texture; mat.emissive = new THREE.Color(0xffffff);
+                    if (!mat.emissiveIntensity || mat.emissiveIntensity === 0) mat.emissiveIntensity = 1.0;
+                    mat.transparent = mat.opacity < 1.0; mat.depthWrite = !mat.transparent; mat.needsUpdate = true;
+                });
+                refreshAllProxies(); statusText.innerText = `发光遮罩已替换`;
+            });
+            e.target.value = '';
+        });
+        document.getElementById('btn-clear-emissive').onclick = () => {
+            if (!activeEditTexture) return;
+            activeEditTexture.materials.forEach(mat => {
+                if (mat.emissiveMap && mat.emissiveMap.dispose) { try { mat.emissiveMap.dispose(); } catch(e){} }
+                mat.emissiveMap = null; mat.emissiveIntensity = 0; mat.needsUpdate = true;
+            });
+            refreshAllProxies(); statusText.innerText = '发光遮罩已清除';
+        };
+
+        document.getElementById('btn-replace-normal').onclick = () => document.getElementById('normal-map-input').click();
+        document.getElementById('normal-map-input').addEventListener('change', (e) => {
+            const file = e.target.files[0]; if (!file || !activeEditTexture) return;
+            new THREE.TextureLoader().load(URL.createObjectURL(file), (texture) => {
+                texture.colorSpace = THREE.NoColorSpace; texture.needsUpdate = true;
+                activeEditTexture.materials.forEach(mat => {
+                    if (mat.normalMap && mat.normalMap.dispose) { try { mat.normalMap.dispose(); } catch(e){} }
+                    mat.normalMap = texture; if (!mat.normalScale) mat.normalScale = new THREE.Vector2(1, 1);
+                    mat.transparent = mat.opacity < 1.0; mat.depthWrite = !mat.transparent; mat.needsUpdate = true;
+                });
+                refreshAllProxies(); statusText.innerText = `法线贴图已替换`;
+            });
+            e.target.value = '';
+        });
+        document.getElementById('btn-clear-normal').onclick = () => {
+            if (!activeEditTexture) return;
+            activeEditTexture.materials.forEach(mat => {
+                if (mat.normalMap && mat.normalMap.dispose) { try { mat.normalMap.dispose(); } catch(e){} }
+                mat.normalMap = null; mat.needsUpdate = true;
+            });
+            refreshAllProxies(); statusText.innerText = '法线贴图已清除';
+        };
+
+        document.getElementById('tex-normal-scale').addEventListener('input', (e) => {
+            if (!activeEditTexture) return; const val = parseFloat(e.target.value); document.getElementById('val-tex-normal-scale').innerText = val.toFixed(1);
+            activeEditTexture.materials.forEach(mat => { if (mat.normalScale) mat.normalScale.set(val, val); else mat.normalScale = new THREE.Vector2(val, val); mat.needsUpdate = true; });
+        });
+
+        function buildProxyBasicMaterial(srcMat) {
+            const opacity = (typeof srcMat.opacity === 'number' && !isNaN(srcMat.opacity)) ? srcMat.opacity : 1;
+            const basic = new THREE.MeshBasicMaterial({ map: srcMat.map || null, color: srcMat.color ? srcMat.color.clone() : new THREE.Color(0xffffff), transparent: opacity < 1.0, opacity: opacity, side: srcMat.side, vertexColors: srcMat.vertexColors, alphaTest: srcMat.alphaTest });
+            basic.userData.isProxy = true; basic.userData.srcMaterial = srcMat; return basic;
+        }
+        function syncProxyFromPBR(mesh) {
+            const pbr = pbrMaterialMap.get(mesh); if (!pbr || !mesh.material) return;
+            const pbrMats = Array.isArray(pbr) ? pbr : [pbr]; const proxies = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            proxies.forEach((proxy, i) => {
+                if (!proxy.userData.isProxy) return; const src = pbrMats[i] || pbrMats[0]; if (!src) return;
+                proxy.map = src.map || null; proxy.color.copy(src.color || new THREE.Color(0xffffff)); proxy.transparent = src.transparent; proxy.opacity = src.opacity; proxy.side = src.side; proxy.needsUpdate = true;
+            });
+        }
+        function refreshAllProxies() { scene.traverse(c => { if (c.isMesh && pbrMaterialMap.has(c) && c.material) { const arr = Array.isArray(c.material) ? c.material : [c.material]; if (arr.some(m => m.userData.isProxy)) syncProxyFromPBR(c); } }); }
+
+        function setRenderMode(lit) {
+            isLitMode = lit; document.getElementById('btn-lit').classList.toggle('active', lit); document.getElementById('btn-matcap').classList.toggle('active', !lit);
+            scene.traverse(c => {
+                if (!c.isMesh || c.userData.isBoneNode || c === floor || c.isLineSegments || c.userData.isCameraHelper || c.userData.isVfxMesh) return;
+                if (c.parent && c.parent.isBone) return;
+                if (!pbrMaterialMap.has(c)) pbrMaterialMap.set(c, c.material);
+                const pbrMat = pbrMaterialMap.get(c);
+                if (lit) {
+                    c.material = pbrMat; const mats = Array.isArray(pbrMat) ? pbrMat : [pbrMat];
+                    mats.forEach(m => { if (m.userData.isProxy) return; if (typeof m.opacity !== 'number' || isNaN(m.opacity) || m.opacity <= 0) m.opacity = 1; if (m.opacity >= 1.0) m.transparent = false; m.needsUpdate = true; });
+                } else {
+                    c.material = Array.isArray(pbrMat) ? pbrMat.map(m => buildProxyBasicMaterial(m)) : buildProxyBasicMaterial(pbrMat);
+                    if (!originalMaterialsMap.has(c)) originalMaterialsMap.set(c, pbrMat);
+                }
+            });
+            if (isEditMode) buildTextureList();
+        }
+
+        document.getElementById('btn-lit').onclick = () => setRenderMode(true);
+        document.getElementById('btn-matcap').onclick = () => setRenderMode(false);
+        document.getElementById('btn-translate').onclick = () => transformControls.setMode('translate'); document.getElementById('btn-rotate').onclick = () => transformControls.setMode('rotate'); document.getElementById('btn-scale').onclick = () => transformControls.setMode('scale');
+        document.getElementById('btn-toggle-skeleton').onclick = () => { showSkeleton = !showSkeleton; boneVisuals.forEach(obj => { obj.visible = showSkeleton; }); };
+
+        // 🌟 核心新增：生成自定义定位器（Empty Object）
+        document.getElementById('btn-add-locator').onclick = () => {
+            if (!selectedNode) return alert("请先在右侧大纲或场景中选中一个骨骼！");
+            if (!selectedNode.isBone && !selectedNode.isGroup && !selectedNode.isMesh) {
+                return alert("只能在骨骼或模型节点上添加定位器！");
+            }
+
+            const locator = new THREE.Object3D();
+            locator.name = "Locator_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
+            locator.position.set(0, 0, 0);
+            locator.rotation.set(0, 0, 0);
+            locator.scale.set(1, 1, 1);
+            locator.userData.isLocator = true;
+            locator.isBone = true; 
+
+            selectedNode.add(locator);
+
+            const locatorVisual = new THREE.Mesh(
+                new THREE.OctahedronGeometry(0.15),
+                new THREE.MeshBasicMaterial({ color: 0xff9800, wireframe: true, depthTest: false, transparent: true, opacity: 0.8 })
+            );
+            locatorVisual.userData.isBoneNode = true; 
+            locatorVisual.userData.bone = locator;    
+            locator.add(locatorVisual);
+            boneVisuals.push(locatorVisual);
+
+            selectedNode = locator;
+            transformControls.attach(locator);
+
+            const ownerModel = loadedModels.find(m => {
+                let found = false;
+                m.group.traverse(c => { if (c === locator) found = true; });
+                return found;
+            });
+            if (ownerModel) refreshModelBoneList(ownerModel);
+
+            buildOutliner();
+            renderKeyframes();
+            statusText.innerText = `已成功在 ${locator.parent.name || '模型'} 上添加定位器！`;
+        };
+
+        document.getElementById('btn-export').onclick = () => {
+            transformControls.detach(); const wasSkel = showSkeleton; boneVisuals.forEach(obj => { obj.visible = false; });
+            composer.render(); const url = renderer.domElement.toDataURL("image/png"); const a = document.createElement('a'); a.href = url; a.download = `E.S_Render_${Date.now()}.png`; a.click();
+            boneVisuals.forEach(obj => { obj.visible = wasSkel; }); if(selectedNode) transformControls.attach(selectedNode);
+        };
+
+        function buildOutliner() {
+            const treeView = document.getElementById('tree-view');
+            treeView.innerHTML = '';
+            if (loadedModels.length === 0 && !sceneCamera && activeParticleInstances.length === 0) { 
+                treeView.innerHTML = '<span style="color:#555;">场景为空</span>'; return; 
+            }
+            if (sceneCamera) { const camNode = createTreeNode(sceneCamera, false, "🎥 预设摄像机"); camNode.querySelector('span:last-child').style.color = "#e91e63"; treeView.appendChild(camNode); }
+            loadedModels.forEach(model => { treeView.appendChild(createTreeNode(model.group, true)); });
+
+            // 渲染粒子库
+            if (loadedParticleAssets.length > 0) {
+                const vfxWrapper = document.createElement('div');
+                vfxWrapper.style.marginTop = "15px";
+                vfxWrapper.innerHTML = `<div style="color:#00e5ff; font-weight:bold; font-size:12px; margin-bottom:5px;">✨ 粒子模板库 (点击选中)</div>`;
+                loadedParticleAssets.forEach(asset => {
+                    const item = document.createElement('div');
+                    item.className = 'tree-node';
+                    if (selectedVfxAsset === asset) item.classList.add('active');
+                    item.innerHTML = `<span class="tree-icon">☄️</span> <span style="flex:1;">${asset.name}</span> <span style="color:#4caf50; font-size:10px;">已选中</span>`;
+                    item.onclick = () => { 
+                        selectedVfxAsset = asset; 
+                        buildOutliner(); 
+                        statusText.innerText = `已选中模板: ${asset.name}`;
+                    };
+                    vfxWrapper.appendChild(item);
+                });
+                treeView.appendChild(vfxWrapper);
+            }
+
+            // 渲染活动特效实例
+            if (activeParticleInstances.length > 0) {
+                const activeWrapper = document.createElement('div');
+                activeWrapper.style.marginTop = "15px";
+                activeWrapper.innerHTML = `<div style="color:#ffaa00; font-weight:bold; font-size:12px; margin-bottom:5px;">🔥 场景中的活动特效</div>`;
+                
+                activeParticleInstances.forEach((inst, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'tree-node';
+                    if (selectedNode === inst.mesh) item.classList.add('active');
+                    
+                    let parentName = "未绑定";
+                    if (inst.mesh.parent && inst.mesh.parent.parent) {
+                        parentName = inst.mesh.parent.parent.name || "骨骼";
+                    }
+
+                    item.innerHTML = `<span class="tree-icon">🔥</span> <span style="flex:1;">${inst.mesh.userData.vfxName} (${index})</span> <span style="font-size:10px; color:#888;">绑于: ${parentName}</span>`;
+                    
+                    item.onclick = () => {
+                        document.querySelectorAll('.tree-node').forEach(n => n.classList.remove('active')); 
+                        item.classList.add('active');
+                        selectedNode = inst.mesh;
+                        if (!isInsideCamera) transformControls.attach(selectedNode);
+                        transformControls.space = 'local';
+                        statusText.innerText = `已选中活动特效: ${inst.mesh.userData.vfxName}`;
+                    };
+
+                    let pressTimer;
+                    item.onmousedown = item.ontouchstart = () => {
+                        pressTimer = setTimeout(() => {
+                            if(confirm("删除这个特效实例吗？")) {
+                                if (inst.mesh.parent) inst.mesh.parent.remove(inst.mesh);
+                                inst.mesh.geometry.dispose();
+                                inst.mesh.material.dispose();
+                                activeParticleInstances = activeParticleInstances.filter(i => i !== inst);
+                                if (selectedNode === inst.mesh) { selectedNode = null; transformControls.detach(); }
+                                buildOutliner();
+                            }
+                        }, 600);
+                    };
+                    item.onmouseup = item.ontouchend = item.onmouseleave = () => clearTimeout(pressTimer);
+
+                    activeWrapper.appendChild(item);
+                });
+                treeView.appendChild(activeWrapper);
+            }
+        }
+        
+        function createTreeNode(obj, isRoot = false, forceName = null) {
+            const wrapper = document.createElement('div'); const row = document.createElement('div');
+            row.className = 'tree-node'; if (selectedNode === obj) row.classList.add('active');
+            
+            let icon = '📦'; let name = forceName;
+            if (!name) {
+                if (isRoot) { const model = loadedModels.find(m => m.group === obj); name = model ? model.name : (obj.name || '未知模型'); }
+                else { name = obj.name || (isRoot ? '场景根节点' : '未知物体'); }
+            }
+
+            if (obj.userData.isLocator) { 
+                icon = '📍'; 
+                if(!forceName) name = obj.name;
+            } else if (obj.isBone) { 
+                icon = '🦴'; 
+                if(!forceName) name = obj.name || 'Bone'; 
+            } else if (obj.isGroup) { icon = '📁'; } 
+            else if (obj.isMesh) { icon = '🔲'; } 
+            else if (obj.isCamera) { icon = '🎥'; } 
+            else if (obj.userData.isVfxMesh) { icon = '☄️'; }
+            
+            if (obj.userData.vfxController) icon = '✨';
+
+            const hasChildren = obj.children && obj.children.length > 0;
+            const toggle = document.createElement('span'); toggle.className = 'tree-toggle'; toggle.innerText = hasChildren ? '▶' : ' ';
+            const iconEl = document.createElement('span'); iconEl.className = 'tree-icon'; iconEl.innerText = icon;
+            const textEl = document.createElement('span'); textEl.innerText = name; textEl.style.flex = '1';
+            
+            row.appendChild(toggle); row.appendChild(iconEl); row.appendChild(textEl);
+
+            row.draggable = true;
+            row.ondragstart = (e) => { e.stopPropagation(); window.draggedNode = obj; e.dataTransfer.effectAllowed = "move"; };
+            row.ondragover = (e) => { e.preventDefault(); row.style.backgroundColor = "rgba(0, 229, 255, 0.2)"; };
+            row.ondragleave = (e) => { row.style.backgroundColor = ""; };
+            row.ondrop = (e) => {
+                e.preventDefault(); e.stopPropagation(); row.style.backgroundColor = "";
+                const draggedObj = window.draggedNode;
+                if (!draggedObj || draggedObj === obj) return;
+
+                if (draggedObj.userData.isVfxMesh) {
+                    if (obj.isBone || obj.isGroup || obj.isMesh || obj.userData.isLocator) {
+                        let vfxController = obj.userData.vfxController;
+                        if (!vfxController) {
+                            vfxController = new THREE.Object3D();
+                            vfxController.position.set(0, 0, 0);
+                            obj.add(vfxController);
+                            obj.userData.vfxController = vfxController;
+                        }
+                        draggedObj.removeFromParent(); 
+                        vfxController.add(draggedObj); 
+                        const s = obj.getWorldScale(new THREE.Vector3());
+                        draggedObj.scale.set(1/s.x, 1/s.y, 1/s.z);
+                        statusText.innerText = `成功将特效绑定至: ${name}`;
+                        buildOutliner(); 
+                    }
+                }
+            };
+
+            const modelRecord = loadedModels.find(m => m.group === obj);
+            if (modelRecord || obj.isCamera || obj.userData.isLocator) {
+                let pressTimer;
+                row.onmousedown = row.ontouchstart = (e) => {
+                    pressTimer = setTimeout(() => {
+                        if (confirm(`确定要彻底删除 ${name} 吗？\n(相关动画数据也会被清除)`)) {
+                            if (obj.isCamera) {
+                                scene.remove(obj); if (sceneCameraHelper) scene.remove(sceneCameraHelper); boneVisuals = boneVisuals.filter(v => v !== sceneCameraHelper);
+                                sceneCamera = null; sceneCameraHelper = null; isInsideCamera = false; controls.enabled = true;
+                                document.getElementById('btn-enter-cam').innerText = "🎥 跳入机位"; document.getElementById('btn-enter-cam').classList.remove('camera-active'); document.getElementById('cam-fov-group').style.display = 'none';
+                            } else if (modelRecord) {
+                                scene.remove(modelRecord.group);
+                                modelRecord.group.traverse(c => { 
+                                    if (c.isMesh) {
+                                        pbrMaterialMap.delete(c); c.geometry.dispose();
+                                        const mats = Array.isArray(c.material) ? c.material : [c.material];
+                                        mats.forEach(m => { if (m.userData.isProxy) return; if(m.map) m.map.dispose(); if(m.emissiveMap) m.emissiveMap.dispose(); if(m.normalMap) m.normalMap.dispose(); m.dispose(); });
+                                    }
+                                });
+                                boneVisuals.forEach(bv => { if (bv.parent === scene && !bv.userData.isCameraHelper) scene.remove(bv); });
+                                loadedModels = loadedModels.filter(m => m.id !== modelRecord.id);
+                                const prefix = `${modelRecord.id}::`;
+                                const keysToDelete = []; animationData.forEach((_, key) => { if (key.startsWith(prefix)) keysToDelete.push(key); }); keysToDelete.forEach(k => animationData.delete(k));
+                                textureRegistry.forEach((data, uuid) => { data.materials = data.materials.filter(m => !mats.includes(m)); if (data.materials.length === 0) textureRegistry.delete(uuid); });
+                            } else if (obj.userData.isLocator) {
+                                const locKey = `locator_${obj.name}`;
+                                animationData.delete(locKey);
+                                if (obj.parent) obj.parent.remove(obj);
+                                boneVisuals = boneVisuals.filter(v => v !== obj.children[0]);
+                            }
+                            if (selectedNode === obj) { selectedNode = null; transformControls.detach(); }
+                            buildOutliner(); renderKeyframes(); updateAnimButtons(); if (isEditMode) buildTextureList();
+                            statusText.innerText = `已删除: ${name}`;
+                        }
+                    }, 600);
+                };
+                row.onmouseup = row.ontouchend = row.onmouseleave = () => clearTimeout(pressTimer);
+            }
+
+            const childrenContainer = document.createElement('div'); childrenContainer.className = 'tree-children'; 
+            if (isRoot) { childrenContainer.classList.add('open'); if (hasChildren) toggle.innerText = '▼'; }
+
+            if (hasChildren && !obj.isCamera) {
+                obj.children.forEach(child => { childrenContainer.appendChild(createTreeNode(child, false)); });
+                toggle.onclick = (e) => { e.stopPropagation(); childrenContainer.classList.toggle('open'); toggle.innerText = childrenContainer.classList.contains('open') ? '▼' : '▶'; };
+            }
+            
+            row.onclick = () => {
+                document.querySelectorAll('.tree-node').forEach(n => n.classList.remove('active')); row.classList.add('active');
+                selectedNode = obj; selectedLight = null; document.getElementById('light-props').style.display = 'none'; updateLightList();
+                if (!isInsideCamera) transformControls.attach(selectedNode);
+                
+                if (selectedNode && (selectedNode.isCamera || selectedNode.userData.isLocator)) transformControls.space = 'local'; 
+                else transformControls.space = 'world';
+                
+                scene.traverse(c => { if (c.userData.isBoneNode) c.material.color.setHex(c.userData.bone === selectedNode ? 0xff3333 : 0x00aaff); });
+                renderKeyframes(); updateAnimButtons();
+            };
+            wrapper.appendChild(row); wrapper.appendChild(childrenContainer); return wrapper;
+        }
+
+        renderer.domElement.addEventListener('pointerdown', () => { isDragging = false; });
+        renderer.domElement.addEventListener('pointermove', () => { isDragging = true; });
+        renderer.domElement.addEventListener('pointerup', (event) => {
+            if (isDragging || isInsideCamera) return; 
+            pointer.x = (event.clientX / canvasContainer.clientWidth) * 2 - 1; pointer.y = -(event.clientY / canvasContainer.clientHeight) * 2 + 1; raycaster.setFromCamera(pointer, camera);
+            const objectsToIntersect = [];
+            loadedModels.forEach(m => m.group.traverse(c => { if(c.isMesh || c.userData.isBoneNode) objectsToIntersect.push(c); }));
+            if(sceneCamera && showSkeleton) objectsToIntersect.push(sceneCameraHelper);
+            
+            activeParticleInstances.forEach(inst => objectsToIntersect.push(inst.mesh));
+
+            const intersects = raycaster.intersectObjects(objectsToIntersect, true);
+            if (intersects.length > 0) {
+                let hit = intersects[0].object; let targetNode = null;
+                
+                if (hit.userData.isVfxMesh) { targetNode = hit; }
+                else if (hit.userData.isBoneNode) { targetNode = hit.userData.bone; } 
+                else if (hit.userData.isCameraHelper) { targetNode = sceneCamera; } 
+                else if (hit.isMesh) {
+                    if (hit.isSkinnedMesh && intersects[0].face) {
+                        const geo = hit.geometry, skinIndex = geo.attributes.skinIndex, skinWeight = geo.attributes.skinWeight; const vIdx = intersects[0].face.a; let maxW = -1, maxI = 0;
+                        for(let i=0; i<4; i++) { const w = skinWeight.getComponent(vIdx, i); if(w > maxW) { maxW = w; maxI = skinIndex.getComponent(vIdx, i); } }
+                        if(hit.skeleton && hit.skeleton.bones[maxI]) targetNode = hit.skeleton.bones[maxI];
+                    } else { targetNode = hit; while (targetNode.parent && targetNode.parent !== scene) { if (targetNode.isBone || targetNode.isGroup) break; targetNode = targetNode.parent; } }
+                }
+                if (targetNode) {
+                    selectedNode = targetNode; selectedLight = null; document.getElementById('light-props').style.display = 'none'; updateLightList(); 
+                    transformControls.attach(selectedNode); buildOutliner(); renderKeyframes();
+                    if (selectedNode && (selectedNode.isCamera || selectedNode.userData.isLocator)) transformControls.space = 'local'; 
+                    else transformControls.space = 'world';
+                    scene.traverse(c => { if (c.userData.isBoneNode) c.material.color.setHex(c.userData.bone === selectedNode ? 0xff3333 : 0x00aaff); });
+                    updateAnimButtons();
+                }
+            } else { transformControls.detach(); selectedNode = null; buildOutliner(); renderKeyframes(); scene.traverse(c => { if (c.userData.isBoneNode) c.material.color.setHex(0x00aaff); }); updateAnimButtons(); }
+        });
+
+        const fileInput = document.getElementById('fileInput'); const dropZone = document.getElementById('drop-zone');
+        dropZone.addEventListener('click', () => fileInput.click()); fileInput.addEventListener('change', (e) => { if (e.target.files.length) processFile(e.target.files[0]); fileInput.value = ''; });
+        
+        function processFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const loader = new GLTFLoader();
+                loader.parse(e.target.result, '', (gltf) => {
+                    const group = gltf.scene;
+                    group.traverse((child) => { 
+                        if (child.isMesh) { 
+                            child.castShadow = true; child.receiveShadow = true; 
+                            pbrMaterialMap.set(child, child.material);
+                            const mats = Array.isArray(child.material) ? child.material : [child.material];
+                            mats.forEach(m => {
+                                if (typeof m.opacity !== 'number' || isNaN(m.opacity) || m.opacity <= 0) m.opacity = 1;
+                                if (m.opacity >= 1.0) m.transparent = false;
+                                if (m.metalness === undefined) m.metalness = 0;
+                                if (m.roughness === undefined) m.roughness = 0.5;
+                            });
+                        } 
+                    });
+                    scene.add(group); group.position.x = loadedModels.length * 5; 
+                    
+                    const uniqueName = getUniqueModelName(file.name);
+                    const suffixMatch = uniqueName.match(/(_\d+)$/); const suffix = suffixMatch ? suffixMatch[0] : '';
+                    applyNameSuffixToHierarchy(group, suffix);
+                    
+                    const modelRecord = { id: generateUniqueId(), group, name: uniqueName };
+                    loadedModels.push(modelRecord);
+                    refreshModelBoneList(modelRecord);
+                    registerModelTextures(group, uniqueName);
+                    
+                    let hasSkinned = false; group.traverse(c => { if(c.isSkinnedMesh) hasSkinned = true; });
+                    if (hasSkinned) {
+                        group.traverse(c => {
+                            if (c.isSkinnedMesh && c.skeleton) {
+                                let rootBone = c.skeleton.bones[0]; while(rootBone.parent && rootBone.parent.isBone) rootBone = rootBone.parent;
+                                const lineHelper = new THREE.SkeletonHelper(rootBone); lineHelper.material.depthTest = false; lineHelper.material.color.setHex(0xffffff); scene.add(lineHelper); boneVisuals.push(lineHelper);
+                                rootBone.traverse(bone => { if(bone.isBone) { const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.06), new THREE.MeshBasicMaterial({ color: 0x00aaff, depthTest: false, transparent: true, opacity: 0.8 })); m.userData.isBoneNode = true; m.userData.bone = bone; bone.add(m); boneVisuals.push(m); } });
+                            }
+                        });
+                    }
+                    buildOutliner();
+                    const box = new THREE.Box3().setFromObject(group); const center = box.getCenter(new THREE.Vector3());
+                    controls.target.copy(center); camera.position.set(center.x, center.y, center.z + 50);
+                    if (!isLitMode) setRenderMode(false); statusText.innerText = `导入成功: ${uniqueName}`;
+                    updateAnimButtons(); if (isEditMode) buildTextureList();
+                });
+            };
+            reader.readAsArrayBuffer(file); 
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (isRenderingVideo) return; 
+
+            if (isAnimMode && isPlaying) { 
+                const elapsed = (performance.now() - playStartTime) / 1000; 
+                currentFrame = Math.floor(elapsed * 20); 
+                if (currentFrame > lastMaxKeyframe) {
+                    currentFrame = 0;
+                    playStartTime = performance.now();
+                }
+                updatePlayhead(); applyAnimationState(currentFrame); 
+            }
+            controls.update();
+
+            activeParticleInstances.forEach(sys => {
+                sys.life += 0.016;
+                
+                if (sys.mesh.material.userData.uvTime) {
+                    sys.mesh.material.userData.uvTime.value = sys.life;
+                }
+
+                const positions = sys.mesh.geometry.attributes.position.array;
+                const colors = sys.mesh.geometry.attributes.color.array;
+                let progress = Math.min(sys.life / sys.maxLife, 1.0);
+
+                // 🌟 循环逻辑判断
+                if (sys.life > sys.maxLife) {
+                    if (particleLoop) {
+                        sys.life = 0;
+                        for (let i = 0; i < positions.length / 3; i++) { positions[i * 3] = 0; positions[i * 3 + 1] = 0; positions[i * 3 + 2] = 0; }
+                    } else {
+                        sys.mesh.visible = false;
+                        return;
+                    }
+                } else {
+                    for (let i = 0; i < positions.length / 3; i++) {
+                        positions[i * 3] += sys.velocities[i].x * 0.016;
+                        positions[i * 3 + 1] += sys.velocities[i].y * 0.016;
+                        positions[i * 3 + 2] += sys.velocities[i].z * 0.016;
+                        
+                        sys.velocities[i].y += sys.gravity * 0.016;
+                        
+                        if (sys.wind) {
+                            sys.velocities[i].x += sys.wind.x * 0.016;
+                            sys.velocities[i].y += sys.wind.y * 0.016;
+                            sys.velocities[i].z += sys.wind.z * 0.016;
+                        }
+                        
+                        sys.velocities[i].x *= sys.drag;
+                        sys.velocities[i].z *= sys.drag;
+
+                        if (sys.colStart && sys.colEnd) {
+                            colors[i * 3] = THREE.MathUtils.lerp(sys.colStart.r, sys.colEnd.r, progress);
+                            colors[i * 3 + 1] = THREE.MathUtils.lerp(sys.colStart.g, sys.colEnd.g, progress);
+                            colors[i * 3 + 2] = THREE.MathUtils.lerp(sys.colStart.b, sys.colEnd.b, progress);
+                        }
+                    }
+                    sys.mesh.geometry.attributes.color.needsUpdate = true;
+                }
+                sys.mesh.geometry.attributes.position.needsUpdate = true;
+            });
+
+            if (globalWeatherSystem) {
+                const sys = globalWeatherSystem;
+                const positions = sys.mesh.geometry.attributes.position.array;
+                sys.mesh.position.x = camera.position.x;
+                sys.mesh.position.z = camera.position.z;
+                for (let i = 0; i < positions.length / 3; i++) {
+                    positions[i * 3] += sys.velocities[i].x * 0.016;
+                    positions[i * 3 + 1] += sys.velocities[i].y * 0.016;
+                    positions[i * 3 + 2] += sys.velocities[i].z * 0.016;
+                    if (positions[i * 3 + 1] < -10) {
+                        positions[i * 3 + 1] = sys.height;
+                        positions[i * 3] = (Math.random() - 0.5) * sys.range;
+                        positions[i * 3 + 2] = (Math.random() - 0.5) * sys.range;
+                    }
+                }
+                sys.mesh.geometry.attributes.position.needsUpdate = true;
+            }
+
+            if (isInsideCamera && sceneCamera) {
+                const renderPass = composer.passes[0]; if (renderPass.camera !== sceneCamera) renderPass.camera = sceneCamera; composer.render();
+            } else {
+                const renderPass = composer.passes[0]; if (renderPass.camera !== camera) renderPass.camera = camera; composer.render(); 
+            }
+        }
+        animate();
+
+        function onWindowResize() {
+            const w = canvasContainer.clientWidth; const h = canvasContainer.clientHeight;
+            camera.aspect = w / h; camera.updateProjectionMatrix(); 
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); renderer.setSize(w, h); 
+            composer.setSize(w, h); fxPass.uniforms.u_resolution.value.set(w, h);
+            if(sceneCamera) { sceneCamera.aspect = w / h; sceneCamera.updateProjectionMatrix(); }
+        }
+        window.addEventListener('resize', onWindowResize);
+
+        transformControls.addEventListener('objectChange', () => {
+            if (isAnimMode && selectedNode && (selectedNode.isBone || selectedNode.isCamera || selectedNode.userData.isLocator)) recordKeyframe(selectedNode, currentFrame, false);
         });
 
         function recordKeyframe(node, frame, showMsg = true) {
-            if (!node.isBone && !node.isCamera) {
-                if (showMsg) alert("只能对骨骼（Bone）或摄像机（Camera）记录关键帧！");
+            if (!node.isBone && !node.isCamera && !node.userData.isLocator) {
+                if (showMsg) alert("只能对骨骼、摄像机或定位器记录关键帧！");
                 return;
             }
             const key = getAnimKey(node);
             if (!key) return;
             if (!animationData.has(key)) animationData.set(key, new Map());
             const nodeData = animationData.get(key);
-            
-            if (frame > 0 && !nodeData.has(0)) {
-                nodeData.set(0, { pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1], interp: 'smooth' });
-            }
-
+            if (frame > 0 && !nodeData.has(0)) nodeData.set(0, { pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1], interp: 'smooth', vfx: [] });
             nodeData.set(frame, {
                 pos: [node.position.x, node.position.y, node.position.z],
                 rot: [node.rotation.x, node.rotation.y, node.rotation.z],
                 scale: [node.scale.x, node.scale.y, node.scale.z],
-                interp: nodeData.has(frame) ? nodeData.get(frame).interp : 'smooth' 
+                interp: nodeData.has(frame) ? nodeData.get(frame).interp : 'smooth',
+                vfx: nodeData.has(frame) ? nodeData.get(frame).vfx : [] 
             });
-            
             if (frame > lastMaxKeyframe) lastMaxKeyframe = frame;
+
+            // 🌟 自动扩展时间轴
+            const currentRulerLength = document.querySelectorAll('.ruler-tick').length;
+            if (frame >= currentRulerLength - 10) {
+                initTimeline();
+            }
+
             renderKeyframes();
             if (showMsg) document.getElementById('anim-status').innerText = `已记录: ${node.name || '骨骼'} (帧 ${frame})`;
         }
@@ -606,62 +1704,64 @@
         document.getElementById('btn-add-kf').onclick = () => {
             if (!selectedNode) {
                 if (loadedModels.length > 0) {
-                    let firstBone = null;
-                    loadedModels[0].group.traverse(c => { if (c.isBone && !firstBone) firstBone = c; });
-                    if (firstBone) selectedNode = firstBone;
-                    else return alert("该模型没有骨骼！");
-                    buildOutliner();
-                    transformControls.attach(selectedNode);
-                } else {
-                    return alert("请先导入一个模型！");
-                }
+                    let firstBone = null; loadedModels[0].group.traverse(c => { if (c.isBone && !firstBone && !c.userData.isLocator) firstBone = c; });
+                    if (firstBone) selectedNode = firstBone; else return alert("该模型没有骨骼！");
+                    buildOutliner(); transformControls.attach(selectedNode);
+                } else { return alert("请先导入一个模型！"); }
             }
-            if (!selectedNode.isBone && !selectedNode.isCamera) {
-                return alert("请在大纲中选择具体的骨骼或摄像机来记录关键帧！");
+            if (!selectedNode.isBone && !selectedNode.isCamera && !selectedNode.userData.isLocator) {
+                return alert("请在大纲中选择具体的骨骼、摄像机或定位器来记录关键帧！");
             }
             recordKeyframe(selectedNode, currentFrame, true);
         };
 
         function initTimeline() {
             const ruler = document.getElementById('timeline-ruler');
-            for (let i = 0; i <= maxFrames; i++) {
+            // 🌟 彻底替换 maxFrames 为 1200 帧起步
+            let framesToDraw = Math.max(1200, lastMaxKeyframe + 200); 
+            if (framesToDraw > 6000) framesToDraw = 6000; 
+
+            ruler.innerHTML = ''; // 清空旧标尺
+            for (let i = 0; i <= framesToDraw; i++) {
                 const tick = document.createElement('div');
                 tick.className = 'ruler-tick' + (i % 5 === 0 ? ' major' : '');
                 tick.style.width = `${tickWidth}px`;
                 if (i % 5 === 0) tick.innerText = i;
-                tick.onclick = (e) => {
-                    e.stopPropagation();
-                    currentFrame = i;
-                    document.getElementById('val-current-frame').innerText = `当前帧: ${currentFrame}`;
+                tick.onclick = (e) => { 
+                    e.stopPropagation(); 
+                    currentFrame = i; 
+                    document.getElementById('val-current-frame').innerText = `当前帧: ${currentFrame}`; 
                     updatePlayhead(); 
-                    applyAnimationState(currentFrame);
+                    applyAnimationState(currentFrame); 
                 };
                 ruler.appendChild(tick);
             }
+            
+            // 🌟 联动修改时间轴轨道和底部的宽度
+            const trackWidth = (framesToDraw + 1) * tickWidth;
+            document.querySelectorAll('.track-lane').forEach(lane => {
+                lane.style.width = `${trackWidth}px`;
+            });
+            document.getElementById('timeline-tracks').style.width = `${trackWidth}px`;
         }
         initTimeline();
 
         function renderKeyframes() {
             const lanes = ['lane-pos', 'lane-rot', 'lane-scale'];
             lanes.forEach(l => document.getElementById(l).innerHTML = '');
-            if (!selectedNode || (!selectedNode.isBone && !selectedNode.isCamera)) return;
+            if (!selectedNode || (!selectedNode.isBone && !selectedNode.isCamera && !selectedNode.userData.isLocator)) return;
             const key = getAnimKey(selectedNode);
             if (!key || !animationData.has(key)) return;
-            
             const nodeData = animationData.get(key);
             nodeData.forEach((data, frame) => {
                 const xPos = frame * tickWidth;
                 lanes.forEach(id => {
                     const kf = document.createElement('div'); 
-                    kf.className = 'keyframe' + (data.interp === 'smooth' ? ' smooth-kf' : ''); 
+                    kf.className = 'keyframe' + (data.interp === 'smooth' ? ' smooth-kf' : '');
+                    if (data.vfx && data.vfx.length > 0) kf.classList.add('has-vfx'); // 🌟 挂载特效的帧变成亮色
                     kf.style.left = `${xPos}px`; 
                     kf.title = `帧 ${frame} | 插值: ${data.interp === 'smooth' ? '平滑(圆)' : '线性(菱)'}`;
-                    kf.onclick = (e) => {
-                        e.stopPropagation();
-                        currentFrame = frame;
-                        document.getElementById('val-current-frame').innerText = `当前帧: ${currentFrame}`;
-                        updatePlayhead(); applyAnimationState(currentFrame);
-                    };
+                    kf.onclick = (e) => { e.stopPropagation(); currentFrame = frame; document.getElementById('val-current-frame').innerText = `当前帧: ${currentFrame}`; updatePlayhead(); applyAnimationState(currentFrame); };
                     let pressTimer;
                     kf.onmousedown = kf.ontouchstart = (e) => { pressTimer = setTimeout(() => { showKfMenu(e, frame, data, false); }, 600); };
                     kf.onmouseup = kf.ontouchend = kf.onmouseleave = () => { clearTimeout(pressTimer); };
@@ -682,10 +1782,8 @@
         const kfMenu = document.getElementById('kf-menu');
         function showKfMenu(e, frame, data, isAudio) {
             activeKeyframeMenuData = { frame, data, isAudio };
-            let x = e.clientX || (e.touches && e.touches[0].clientX);
-            let y = e.clientY || (e.touches && e.touches[0].clientY);
-            kfMenu.style.display = 'flex';
-            kfMenu.style.left = `${x}px`; kfMenu.style.top = `${y}px`;
+            let x = e.clientX || (e.touches && e.touches[0].clientX); let y = e.clientY || (e.touches && e.touches[0].clientY);
+            kfMenu.style.display = 'flex'; kfMenu.style.left = `${x}px`; kfMenu.style.top = `${y}px`;
             if (y > window.innerHeight - 200) kfMenu.style.top = `${y - 200}px`;
         }
         document.addEventListener('click', () => { kfMenu.style.display = 'none'; });
@@ -694,10 +1792,8 @@
             if (activeKeyframeMenuData && selectedNode) {
                 const key = getAnimKey(selectedNode);
                 if(key && animationData.has(key)) {
-                    const nodeData = animationData.get(key);
-                    nodeData.delete(activeKeyframeMenuData.frame);
-                    lastMaxKeyframe = 0;
-                    nodeData.forEach((_, f) => { if(f > lastMaxKeyframe) lastMaxKeyframe = f; });
+                    const nodeData = animationData.get(key); nodeData.delete(activeKeyframeMenuData.frame);
+                    lastMaxKeyframe = 0; nodeData.forEach((_, f) => { if(f > lastMaxKeyframe) lastMaxKeyframe = f; });
                     renderKeyframes();
                 }
             }
@@ -714,7 +1810,7 @@
                 }
             }
         };
-        
+
         document.getElementById('menu-set-linear').onclick = () => { setInterpolation('linear'); };
         document.getElementById('menu-set-smooth').onclick = () => { setInterpolation('smooth'); };
         function setInterpolation(type) {
@@ -728,21 +1824,114 @@
         }
 
         function lerp(a, b, t) { return a + (b - a) * t; }
-        
+
+        // 🌟 极简绑定按钮
+        document.getElementById('btn-bind-vfx').onclick = () => {
+            if (!selectedNode || !selectedNode.userData.isLocator) {
+                return alert("请先在右侧大纲中点击选中一个【📍定位器】！");
+            }
+            if (!selectedVfxAsset) {
+                return alert("请先在右侧大纲的【✨粒子模板库】中选中一个粒子！");
+            }
+            
+            const key = getAnimKey(selectedNode);
+            if (!key) return;
+
+            if (!animationData.has(key)) {
+                animationData.set(key, new Map());
+            }
+            const nodeData = animationData.get(key);
+            
+            if (!nodeData.has(currentFrame)) {
+                recordKeyframe(selectedNode, currentFrame, false);
+            }
+
+            const frameData = nodeData.get(currentFrame);
+            if (!frameData.vfx) frameData.vfx = [];
+
+            frameData.vfx = [{
+                assetName: selectedVfxAsset.name,
+                offset: [0, 0, 0],
+                scale: [1, 1, 1],
+                once: true
+            }];
+
+            statusText.innerText = `✅ 绑定成功: [${selectedVfxAsset.name}] -> 帧 ${currentFrame}`;
+            document.getElementById('anim-status').innerText = `✅ 第 ${currentFrame} 帧已挂载特效`;
+            renderKeyframes();
+        };
+
+        function clearLocatorVfx() {
+            activeLocatorVfx.forEach(inst => {
+                if (inst.mesh.parent) inst.mesh.parent.remove(inst.mesh);
+                inst.mesh.geometry.dispose();
+                inst.mesh.material.dispose();
+                const idx = activeParticleInstances.indexOf(inst);
+                if (idx > -1) activeParticleInstances.splice(idx, 1);
+            });
+            activeLocatorVfx = [];
+        }
+
+        function triggerLocatorVfx(locator, vfxDesc) {
+            if (!vfxDesc || !vfxDesc.assetName) return;
+            
+            let existing = activeLocatorVfx.find(v => v.mesh.userData.parentLocName === locator.name && v.mesh.userData.vfxName === vfxDesc.assetName);
+            if (existing) return;
+
+            const asset = loadedParticleAssets.find(a => a.name === vfxDesc.assetName);
+            if (!asset) { console.warn('未找到粒子模板:', vfxDesc.assetName); return; }
+
+            const tempConfig = JSON.parse(JSON.stringify(asset.config));
+            if(tempConfig.physics) {
+                tempConfig.physics.speed = 0.5; 
+            }
+
+            const instData = createParticleMesh(tempConfig, asset.texture);
+            instData.mesh.userData.isVfxMesh = true;
+            instData.mesh.userData.isEventVfx = true; 
+            instData.mesh.userData.vfxName = asset.name;
+            instData.mesh.userData.parentLocName = locator.name;
+
+            const offset = vfxDesc.offset || [0, 0, 0];
+            const scl = vfxDesc.scale || [1, 1, 1];
+
+            const worldPos = new THREE.Vector3();
+            locator.getWorldPosition(worldPos); 
+            
+            scene.add(instData.mesh); 
+            instData.mesh.position.copy(worldPos);
+            instData.mesh.scale.set(scl[0], scl[1], scl[2]);
+
+            activeParticleInstances.push(instData);
+            activeLocatorVfx.push(instData);
+        }
+
         function applyAnimationState(frame) {
+            activeParticleInstances.forEach(p => { if (p.mesh && !p.mesh.userData.isEventVfx) p.mesh.visible = false; });
+
+            if (!isPlaying) {
+                clearLocatorVfx();
+            }
+
             animationData.forEach((nodeData, key) => {
                 if (nodeData.size === 0) return;
                 
                 let targetNode = null;
+                let isLocatorKey = false;
+
                 if (key.startsWith('camera_')) {
-                    const camId = parseInt(key.substring(7));
+                    const camId = parseInt(key.substring(7)); 
                     if (sceneCamera && sceneCamera.id === camId) targetNode = sceneCamera;
+                } else if (key.startsWith('locator_')) {
+                    const locName = key.substring(8);
+                    scene.traverse(c => { if (!targetNode && c.userData.isLocator && c.name === locName) targetNode = c; });
+                    isLocatorKey = true;
                 } else {
-                    const sepIdx = key.indexOf('::bone:');
+                    const sepIdx = key.indexOf('::bone:'); 
                     if (sepIdx === -1) return;
-                    const modelId = key.substring(0, sepIdx);
+                    const modelId = key.substring(0, sepIdx); 
                     const boneIndex = parseInt(key.substring(sepIdx + 7));
-                    const model = loadedModels.find(m => m.id === modelId);
+                    const model = loadedModels.find(m => m.id === modelId); 
                     if (model) targetNode = getBoneByIndex(model, boneIndex);
                 }
                 if (!targetNode) return;
@@ -756,7 +1945,7 @@
                 if (prevFrame === -1) prevFrame = frames[0];
                 if (nextFrame === -1) nextFrame = frames[frames.length - 1];
 
-                const pData = nodeData.get(prevFrame);
+                const pData = nodeData.get(prevFrame); 
                 const nData = nodeData.get(nextFrame);
 
                 if (pData && nData) {
@@ -764,18 +1953,14 @@
                     const t = frameGap === 0 ? 0 : (frame - prevFrame) / frameGap;
                     
                     let interpFunc;
-                    if (pData.interp === 'linear') {
-                        interpFunc = lerp;
-                    } else {
-                        if (frameGap <= bounceThreshold) {
-                            interpFunc = (a, b, t) => {
-                                const smoothT = t * t * (3 - 2 * t);
-                                return a + (b - a) * smoothT;
-                            };
+                    if (pData.interp === 'linear') { interpFunc = lerp; } 
+                    else {
+                        if (frameGap <= bounceThreshold) { 
+                            interpFunc = (a, b, t) => { const smoothT = t * t * (3 - 2 * t); return a + (b - a) * smoothT; }; 
                         } else {
                             interpFunc = (a, b, t) => {
-                                t = Math.max(0, Math.min(1, t));
-                                const c1 = bounceStrength; // 这里用上了滑块的值
+                                t = Math.max(0, Math.min(1, t)); 
+                                const c1 = bounceStrength; 
                                 const c3 = c1 + 1;
                                 const s = 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
                                 return a + (b - a) * s;
@@ -786,6 +1971,13 @@
                     targetNode.position.set(interpFunc(pData.pos[0], nData.pos[0], t), interpFunc(pData.pos[1], nData.pos[1], t), interpFunc(pData.pos[2], nData.pos[2], t));
                     targetNode.rotation.set(interpFunc(pData.rot[0], nData.rot[0], t), interpFunc(pData.rot[1], nData.rot[1], t), interpFunc(pData.rot[2], nData.rot[2], t));
                     targetNode.scale.set(interpFunc(pData.scale[0], nData.scale[0], t), interpFunc(pData.scale[1], nData.scale[1], t), interpFunc(pData.scale[2], nData.scale[2], t));
+
+                    if (isLocatorKey && isPlaying) {
+                        const fd = nodeData.get(frame);
+                        if (fd && fd.vfx && fd.vfx.length > 0) {
+                            fd.vfx.forEach(desc => triggerLocatorVfx(targetNode, desc));
+                        }
+                    }
                 }
             });
         }
@@ -793,7 +1985,7 @@
         document.getElementById('btn-play-anim').onclick = () => { 
             isPlaying = !isPlaying; 
             document.getElementById('btn-play-anim').innerText = isPlaying ? '⏸ 暂停' : '▶ 播放'; 
-            if(isPlaying) { playStartTime = performance.now(); } 
+            if(isPlaying) { playStartTime = performance.now() - (currentFrame / 20) * 1000; } 
         };
 
         function createLightUI(type) {
@@ -835,8 +2027,7 @@
             sceneCamera = new THREE.PerspectiveCamera(40, canvasContainer.clientWidth / canvasContainer.clientHeight, 0.1, 5000); 
             sceneCamera.position.set(20, 20, 40); sceneCamera.lookAt(0, 10, 0); scene.add(sceneCamera);
             sceneCameraHelper = new THREE.CameraHelper(sceneCamera); scene.add(sceneCameraHelper); boneVisuals.push(sceneCameraHelper); sceneCameraHelper.userData.isCameraHelper = true;
-            selectedNode = sceneCamera; 
-            transformControls.space = 'local';
+            selectedNode = sceneCamera; transformControls.space = 'local';
             transformControls.attach(sceneCamera); buildOutliner();
             document.getElementById('cam-fov-group').style.display = 'block'; document.getElementById('slider-cam-fov').value = 40;
         };
@@ -851,210 +2042,158 @@
         };
         document.getElementById('slider-cam-fov').addEventListener('input', (e) => { if(!sceneCamera) return; sceneCamera.fov = parseFloat(e.target.value); sceneCamera.updateProjectionMatrix(); document.getElementById('val-cam-fov').innerText = e.target.value; if(sceneCameraHelper) sceneCameraHelper.update(); });
 
-        function setRenderMode(lit) {
-            isLitMode = lit; document.getElementById('btn-lit').classList.toggle('active', lit); document.getElementById('btn-matcap').classList.toggle('active', !lit);
-            scene.traverse(c => { 
-                if (c.isMesh && !c.userData.isBoneNode && c !== floor && !c.isLineSegments && !c.userData.isCameraHelper) {
-                    if (!lit) { if (!originalMaterialsMap.has(c)) originalMaterialsMap.set(c, c.material); const oldMats = Array.isArray(c.material) ? c.material : [c.material]; c.material = Array.isArray(c.material) ? oldMats.map(m => new THREE.MeshBasicMaterial({ map: m.map, color: m.color })) : new THREE.MeshBasicMaterial({ map: oldMats[0].map, color: oldMats[0].color }); }
-                    else { if (originalMaterialsMap.has(c)) { c.material = originalMaterialsMap.get(c); originalMaterialsMap.delete(c); } }
+        document.getElementById('btn-export-project').onclick = async () => {
+            if (loadedModels.length === 0) return alert("场景是空的！");
+            
+            statusText.innerText = "正在打包工程...";
+            const zip = new JSZip();
+            
+            const projectData = {
+                version: 1,
+                animation: Array.from(animationData.entries()).map(([key, map]) => ({ key: key, frames: Array.from(map.entries()) })),
+                lastMaxKeyframe: lastMaxKeyframe,
+                currentFrame: currentFrame,
+                locators: [],
+                customParticles: []
+            };
+
+            scene.traverse(c => {
+                if (c.userData.isLocator) {
+                    projectData.locators.push({
+                        name: c.name,
+                        parentBoneName: c.parent.name,
+                        pos: c.position.toArray(),
+                        rot: c.rotation.toArray(),
+                        scale: c.scale.toArray()
+                    });
                 }
             });
-        }
-        document.getElementById('btn-lit').onclick = () => setRenderMode(true); document.getElementById('btn-matcap').onclick = () => setRenderMode(false);
-        document.getElementById('btn-translate').onclick = () => transformControls.setMode('translate'); document.getElementById('btn-rotate').onclick = () => transformControls.setMode('rotate'); document.getElementById('btn-scale').onclick = () => transformControls.setMode('scale');
-        document.getElementById('btn-toggle-skeleton').onclick = () => { showSkeleton = !showSkeleton; boneVisuals.forEach(obj => { obj.visible = showSkeleton; }); };
-        
-        document.getElementById('btn-export').onclick = () => {
-            transformControls.detach(); const wasSkel = showSkeleton; boneVisuals.forEach(obj => { obj.visible = false; });
-            composer.render(); const url = renderer.domElement.toDataURL("image/png"); const a = document.createElement('a'); a.href = url; a.download = `E.S_Render_${Date.now()}.png`; a.click();
-            boneVisuals.forEach(obj => { obj.visible = wasSkel; }); if(selectedNode) transformControls.attach(selectedNode);
+
+            const particleFolder = zip.folder("particles");
+            let pIndex = 0;
+            for (let asset of loadedParticleAssets) {
+                if (asset.texture.image && asset.texture.image instanceof HTMLCanvasElement) continue; 
+                
+                const pName = `custom_particle_${pIndex++}`;
+                projectData.customParticles.push({
+                    id: pName,
+                    name: asset.name,
+                    config: asset.config,
+                    textureFile: `${pName}.png`
+                });
+
+                if (asset.texture.image && asset.texture.image.src) {
+                    try {
+                        const res = await fetch(asset.texture.image.src);
+                        const blob = await res.blob();
+                        particleFolder.file(`${pName}.png`, blob);
+                    } catch(e) { console.warn("无法打包粒子贴图", e); }
+                }
+            }
+
+            zip.file("project.json", JSON.stringify(projectData, null, 2));
+
+            const content = await zip.generateAsync({ type: "blob" });
+            const url = URL.createObjectURL(content);
+            const a = document.createElement('a'); 
+            a.href = url; 
+            a.download = `E.S_Project_${Date.now()}.es3d`; 
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            statusText.innerText = "工程打包成功！";
         };
 
-        function buildOutliner() {
-            outlinerContent.innerHTML = '';
-            if (loadedModels.length === 0 && !sceneCamera) { outlinerContent.innerHTML = '<span style="color:#555;">无模型</span>'; return; }
-            if (sceneCamera) { const camNode = createTreeNode(sceneCamera, false, "🎥 预设摄像机"); camNode.querySelector('span:last-child').style.color = "#e91e63"; outlinerContent.appendChild(camNode); }
-            loadedModels.forEach(model => { outlinerContent.appendChild(createTreeNode(model.group, true)); });
-        }
-        
-        function createTreeNode(obj, isRoot = false, forceName = null) {
-            const wrapper = document.createElement('div'); const row = document.createElement('div');
-            row.className = 'tree-node'; if (selectedNode === obj) row.classList.add('active');
-            let icon = '📦'; let name = forceName;
-            if (!name) {
-                if (isRoot) {
-                    const model = loadedModels.find(m => m.group === obj);
-                    name = model ? model.name : (obj.name || '未知模型');
-                } else {
-                    name = obj.name || (isRoot ? '场景根节点' : '未知物体');
-                }
-            }
-            if (obj.isBone) { icon = '🦴'; if(!forceName) name = obj.name || 'Bone'; } else if (obj.isGroup) { icon = '📁'; } else if (obj.isMesh) { icon = '🔲'; } else if (obj.isCamera) { icon = '🎥'; }
-            const hasChildren = obj.children && obj.children.length > 0;
-            const toggle = document.createElement('span'); toggle.className = 'tree-toggle'; toggle.innerText = hasChildren ? '▶' : ' ';
-            const iconEl = document.createElement('span'); iconEl.className = 'tree-icon'; iconEl.innerText = icon;
-            const textEl = document.createElement('span'); textEl.innerText = name;
-            row.appendChild(toggle); row.appendChild(iconEl); row.appendChild(textEl);
+        document.getElementById('btn-import-project').onclick = () => document.getElementById('project-input').click();
+        document.getElementById('project-input').addEventListener('change', async (e) => {
+            const file = e.target.files[0]; if (!file) return;
+            statusText.innerText = "正在解析工程包...";
             
-            const childrenContainer = document.createElement('div'); childrenContainer.className = 'tree-children'; 
-            if (isRoot) {
-                childrenContainer.classList.add('open');
-                if (hasChildren) toggle.innerText = '▼';
-            }
+            try {
+                const zip = new JSZip();
+                const zipContent = await zip.loadAsync(file);
+                
+                const projectJsonStr = await zipContent.file("project.json").async("string");
+                const projectData = JSON.parse(projectJsonStr);
 
-            if (hasChildren && !obj.isCamera) {
-                obj.children.forEach(child => { childrenContainer.appendChild(createTreeNode(child, false)); });
-                toggle.onclick = (e) => { e.stopPropagation(); childrenContainer.classList.toggle('open'); toggle.innerText = childrenContainer.classList.contains('open') ? '▼' : '▶'; };
-            }
-            row.onclick = () => {
-                document.querySelectorAll('.tree-node').forEach(n => n.classList.remove('active')); row.classList.add('active');
-                selectedNode = obj; selectedLight = null; document.getElementById('light-props').style.display = 'none'; updateLightList();
-                if (!isInsideCamera) transformControls.attach(selectedNode);
-                if (selectedNode && selectedNode.isCamera) transformControls.space = 'local';
-                else transformControls.space = 'world';
-                scene.traverse(c => { if (c.userData.isBoneNode) c.material.color.setHex(c.userData.bone === selectedNode ? 0xff3333 : 0x00aaff); });
-                renderKeyframes(); 
-                updateAnimButtons();
-            };
-            wrapper.appendChild(row); wrapper.appendChild(childrenContainer); return wrapper;
-        }
+                animationData = new Map();
+                projectData.animation.forEach(item => animationData.set(item.key, new Map(item.frames)));
+                lastMaxKeyframe = projectData.lastMaxKeyframe; 
+                currentFrame = projectData.currentFrame;
+                updatePlayhead();
 
-        renderer.domElement.addEventListener('pointerdown', () => { isDragging = false; });
-        renderer.domElement.addEventListener('pointermove', () => { isDragging = true; });
-        renderer.domElement.addEventListener('pointerup', (event) => {
-            if (isDragging || isInsideCamera) return; 
-            pointer.x = (event.clientX / canvasContainer.clientWidth) * 2 - 1; pointer.y = -(event.clientY / canvasContainer.clientHeight) * 2 + 1; raycaster.setFromCamera(pointer, camera);
-            const objectsToIntersect = [];
-            loadedModels.forEach(m => m.group.traverse(c => { if(c.isMesh || c.userData.isBoneNode) objectsToIntersect.push(c); }));
-            if(sceneCamera && showSkeleton) objectsToIntersect.push(sceneCameraHelper);
-            const intersects = raycaster.intersectObjects(objectsToIntersect, true);
-            if (intersects.length > 0) {
-                let hit = intersects[0].object; let targetNode = null;
-                if (hit.userData.isBoneNode) { targetNode = hit.userData.bone; } 
-                else if (hit.userData.isCameraHelper) { targetNode = sceneCamera; } 
-                else if (hit.isMesh) {
-                    if (hit.isSkinnedMesh && intersects[0].face) {
-                        const geo = hit.geometry, skinIndex = geo.attributes.skinIndex, skinWeight = geo.attributes.skinWeight; const vIdx = intersects[0].face.a; let maxW = -1, maxI = 0;
-                        for(let i=0; i<4; i++) { const w = skinWeight.getComponent(vIdx, i); if(w > maxW) { maxW = w; maxI = skinIndex.getComponent(vIdx, i); } }
-                        if(hit.skeleton && hit.skeleton.bones[maxI]) targetNode = hit.skeleton.bones[maxI];
-                    } else { targetNode = hit; while (targetNode.parent && targetNode.parent !== scene) { if (targetNode.isBone || targetNode.isGroup) break; targetNode = targetNode.parent; } }
+                if (projectData.locators && projectData.locators.length > 0) {
+                    projectData.locators.forEach(locData => {
+                        let targetBone = null;
+                        scene.traverse(c => { if (c.isBone && c.name === locData.parentBoneName) targetBone = c; });
+
+                        if (targetBone) {
+                            const locator = new THREE.Object3D();
+                            locator.name = locData.name;
+                            locator.isBone = true; 
+                            locator.userData.isLocator = true;
+                            locator.position.fromArray(locData.pos);
+                            locator.rotation.fromArray(locData.rot);
+                            locator.scale.fromArray(locData.scale);
+
+                            const locatorVisual = new THREE.Mesh(
+                                new THREE.OctahedronGeometry(0.15),
+                                new THREE.MeshBasicMaterial({ color: 0xff9800, wireframe: true, depthTest: false, transparent: true, opacity: 0.8 })
+                            );
+                            locatorVisual.userData.isBoneNode = true; 
+                            locatorVisual.userData.bone = locator;    
+                            locator.add(locatorVisual);
+                            boneVisuals.push(locatorVisual);
+
+                            targetBone.add(locator);
+                        }
+                    });
                 }
-                if (targetNode) {
-                    selectedNode = targetNode; selectedLight = null; document.getElementById('light-props').style.display = 'none'; updateLightList(); 
-                    transformControls.attach(selectedNode); buildOutliner(); renderKeyframes();
-                    if (selectedNode && selectedNode.isCamera) transformControls.space = 'local';
-                    else transformControls.space = 'world';
-                    scene.traverse(c => { if (c.userData.isBoneNode) c.material.color.setHex(c.userData.bone === selectedNode ? 0xff3333 : 0x00aaff); });
-                    updateAnimButtons();
+
+                if (projectData.customParticles && projectData.customParticles.length > 0) {
+                    for (let pData of projectData.customParticles) {
+                        const texFile = zipContent.file(`particles/${pData.textureFile}`);
+                        if (texFile) {
+                            const imgBlob = await texFile.async("blob");
+                            const imgUrl = URL.createObjectURL(imgBlob);
+                            const tex = await new Promise(resolve => {
+                                new THREE.TextureLoader().load(imgUrl, t => { 
+                                    t.colorSpace = THREE.SRGBColorSpace; 
+                                    t.userData.uvGrid = (pData.config.uv && pData.config.uv.length === 2) ? pData.config.uv : [1, 1];
+                                    resolve(t); 
+                                });
+                            });
+                            
+                            const asset = { name: pData.name, config: pData.config, texture: tex, meshInstance: null };
+                            loadedParticleAssets.push(asset);
+                        }
+                    }
                 }
-            } else { transformControls.detach(); selectedNode = null; buildOutliner(); renderKeyframes(); scene.traverse(c => { if (c.userData.isBoneNode) c.material.color.setHex(0x00aaff); }); updateAnimButtons(); }
+
+                buildOutliner(); renderKeyframes(); applyAnimationState(currentFrame);
+                statusText.innerText = "工程配置与自定义特效完美恢复！";
+                alert(`🎉 工程读取成功！\n恢复了 ${projectData.locators.length} 个定位器，${projectData.customParticles ? projectData.customParticles.length : 0} 个自定义粒子包。`);
+
+            } catch (err) {
+                console.error(err);
+                alert("解析工程包失败: " + err.message);
+                statusText.innerText = "解析失败";
+            }
+            e.target.value = '';
         });
 
-        const fileInput = document.getElementById('fileInput'); const dropZone = document.getElementById('drop-zone');
-        dropZone.addEventListener('click', () => fileInput.click()); fileInput.addEventListener('change', (e) => { if (e.target.files.length) processFile(e.target.files[0]); fileInput.value = ''; });
-        
-        function processFile(file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const loader = new GLTFLoader();
-                loader.parse(e.target.result, '', (gltf) => {
-                    const group = gltf.scene;
-                    group.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
-                    scene.add(group); group.position.x = loadedModels.length * 5; 
-                    
-                    const uniqueName = getUniqueModelName(file.name);
-                    const suffixMatch = uniqueName.match(/(_\d+)$/);
-                    const suffix = suffixMatch ? suffixMatch[0] : '';
-                    applyNameSuffixToHierarchy(group, suffix);
-                    
-                    const modelRecord = { id: generateUniqueId(), group, name: uniqueName };
-                    loadedModels.push(modelRecord);
-                    refreshModelBoneList(modelRecord);
-                    
-                    let hasSkinned = false; group.traverse(c => { if(c.isSkinnedMesh) hasSkinned = true; });
-                    if (hasSkinned) {
-                        group.traverse(c => {
-                            if (c.isSkinnedMesh && c.skeleton) {
-                                let rootBone = c.skeleton.bones[0]; while(rootBone.parent && rootBone.parent.isBone) rootBone = rootBone.parent;
-                                const lineHelper = new THREE.SkeletonHelper(rootBone); lineHelper.material.depthTest = false; lineHelper.material.color.setHex(0xffffff); scene.add(lineHelper); boneVisuals.push(lineHelper);
-                                rootBone.traverse(bone => { if(bone.isBone) { const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.06), new THREE.MeshBasicMaterial({ color: 0x00aaff, depthTest: false, transparent: true, opacity: 0.8 })); m.userData.isBoneNode = true; m.userData.bone = bone; bone.add(m); boneVisuals.push(m); } });
-                            }
-                        });
-                    }
-                    buildOutliner();
-                    const box = new THREE.Box3().setFromObject(group); const center = box.getCenter(new THREE.Vector3());
-                    controls.target.copy(center); camera.position.set(center.x, center.y, center.z + 50);
-                    if (!isLitMode) setRenderMode(false); statusText.innerText = `导入成功: ${uniqueName}`;
-                    updateAnimButtons();
-                });
-            };
-            reader.readAsArrayBuffer(file); 
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            if (isRenderingVideo) return; 
-
-            if (isAnimMode && isPlaying) { 
-                const elapsed = (performance.now() - playStartTime) / 1000; 
-                currentFrame = Math.floor(elapsed * 20) % (lastMaxKeyframe + 1); 
-                updatePlayhead(); 
-                applyAnimationState(currentFrame); 
-            }
-            controls.update();
-            if (isInsideCamera && sceneCamera) {
-                const renderPass = composer.passes[0]; if (renderPass.camera !== sceneCamera) renderPass.camera = sceneCamera; composer.render();
-            } else {
-                const renderPass = composer.passes[0]; if (renderPass.camera !== camera) renderPass.camera = camera; composer.render(); 
-            }
-        }
-        animate();
-
-        function onWindowResize() {
-            const w = canvasContainer.clientWidth; 
-            const h = canvasContainer.clientHeight;
-            camera.aspect = w / h; 
-            camera.updateProjectionMatrix(); 
-            
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.setSize(w, h); 
-            
-            composer.setSize(w, h); 
-            fxPass.uniforms.u_resolution.value.set(w, h);
-            
-            if(sceneCamera) { 
-                sceneCamera.aspect = w / h; 
-                sceneCamera.updateProjectionMatrix(); 
-            }
-        }
-        window.addEventListener('resize', onWindowResize);
-
         document.getElementById('btn-export-anim').addEventListener('click', () => {
-            if (animationData.size === 0) {
-                alert("当前没有动画数据可导出。请先在动画模式下记录关键帧。");
-                return;
-            }
-            const animDataObj = {};
-            animationData.forEach((nodeMap, key) => {
-                const frames = {};
-                nodeMap.forEach((data, frame) => {
-                    frames[frame] = { pos: data.pos, rot: data.rot, scale: data.scale, interp: data.interp };
-                });
-                animDataObj[key] = frames;
+            if (animationData.size === 0) return alert("当前没有动画数据可导出。");
+            const animDataObj = {}; 
+            animationData.forEach((nodeMap, key) => { 
+                const frames = {}; 
+                nodeMap.forEach((data, frame) => { frames[frame] = { pos: data.pos, rot: data.rot, scale: data.scale, interp: data.interp, vfx: data.vfx }; }); 
+                animDataObj[key] = frames; 
             });
-            const modelNames = {};
-            loadedModels.forEach(m => { modelNames[m.id] = m.name; });
-            const animJson = {
-                version: 5,
-                format: "named-multi-model-bone-index",
-                animationData: animDataObj,
-                modelNames: modelNames,
-                lastMaxKeyframe: lastMaxKeyframe,
-                currentFrame: currentFrame
-            };
+            const modelNames = {}; loadedModels.forEach(m => { modelNames[m.id] = m.name; });
+            const animJson = { version: 5, format: "named-multi-model-bone-index", animationData: animDataObj, modelNames: modelNames, lastMaxKeyframe: lastMaxKeyframe, currentFrame: currentFrame };
             const blob = new Blob([JSON.stringify(animJson, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `E.S_Anim_${Date.now()}.esanim`; a.click(); URL.revokeObjectURL(url);
+            const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `E.S_Anim_${Date.now()}.esanim`; a.click(); URL.revokeObjectURL(url);
             document.getElementById('anim-status').innerText = "全局动画已导出";
         });
 
@@ -1076,8 +2215,7 @@
                         loadedModels.forEach(targetModel => {
                             const matchOldId = Object.keys(data.modelNames).find(id => data.modelNames[id] === targetModel.name);
                             if (matchOldId) {
-                                matchedOldIds.add(matchOldId);
-                                refreshModelBoneList(targetModel);
+                                matchedOldIds.add(matchOldId); refreshModelBoneList(targetModel);
                                 const boneList = modelBoneLists.get(targetModel);
                                 let modelHasAnim = false;
                                 oldKeys.forEach(key => {
@@ -1085,11 +2223,9 @@
                                         const boneIndex = parseInt(key.substring(key.indexOf('::bone:') + 7));
                                         if (boneIndex < boneList.length) {
                                             const newKey = `${targetModel.id}::bone:${boneIndex}`;
-                                            const frames = data.animationData[key];
-                                            const nodeData = new Map();
+                                            const frames = data.animationData[key]; const nodeData = new Map();
                                             Object.keys(frames).forEach(f => nodeData.set(parseInt(f), frames[f]));
-                                            animationData.set(newKey, nodeData);
-                                            modelHasAnim = true;
+                                            animationData.set(newKey, nodeData); modelHasAnim = true;
                                         }
                                     }
                                 });
@@ -1099,8 +2235,7 @@
                     }
 
                     loadedModels.forEach(targetModel => {
-                        let hasAnim = false;
-                        const prefix = `${targetModel.id}::`;
+                        let hasAnim = false; const prefix = `${targetModel.id}::`;
                         animationData.forEach((_, key) => { if (key.startsWith(prefix)) hasAnim = true; });
                         if (hasAnim) return; 
 
@@ -1108,8 +2243,7 @@
                         const boneList = modelBoneLists.get(targetModel);
                         if (!boneList || boneList.length === 0) return;
 
-                        let modelHasAnim = false;
-                        const availableBoneIndices = new Set();
+                        let modelHasAnim = false; const availableBoneIndices = new Set();
                         oldKeys.forEach(key => {
                             const modelIdInKey = key.split('::')[0];
                             if (!matchedOldIds.has(modelIdInKey)) {
@@ -1133,14 +2267,20 @@
 
                             if (sourceKey) {
                                 const newKey = `${targetModel.id}::bone:${boneIndex}`;
-                                const frames = data.animationData[sourceKey];
-                                const nodeData = new Map();
+                                const frames = data.animationData[sourceKey]; const nodeData = new Map();
                                 Object.keys(frames).forEach(f => nodeData.set(parseInt(f), frames[f]));
-                                animationData.set(newKey, nodeData);
-                                modelHasAnim = true;
+                                animationData.set(newKey, nodeData); modelHasAnim = true;
                             }
                         });
                         if (modelHasAnim) importedModelsCount++;
+                    });
+
+                    oldKeys.forEach(key => {
+                        if (key.startsWith('locator_')) {
+                            const frames = data.animationData[key]; const nodeData = new Map();
+                            Object.keys(frames).forEach(f => nodeData.set(parseInt(f), frames[f]));
+                            animationData.set(key, nodeData);
+                        }
                     });
                     
                     if (data.lastMaxKeyframe > lastMaxKeyframe) lastMaxKeyframe = data.lastMaxKeyframe;
@@ -1163,67 +2303,34 @@
             if (animationData.size === 0) return alert("没有动画数据，请先制作动画！");
 
             if (window.innerHeight > window.innerWidth) {
-                if (!confirm("检测到您当前是竖屏。为了获得最佳的 16:9 画面且避免拉伸，建议您退出后把手机横过来，再点击导出。\n\n是否继续强行导出？")) {
-                    return;
-                }
+                if (!confirm("检测到您当前是竖屏。建议您退出后把手机横过来导出。\n\n是否继续强行导出？")) return;
             }
 
             window.removeEventListener('resize', onWindowResize);
-
             document.getElementById('render-modal').style.display = 'flex';
             document.getElementById('render-bar').style.width = '0%';
             document.getElementById('render-text').innerText = '正在初始化 MP4 编码器...';
             document.getElementById('btn-cancel-render').onclick = () => { cancelRender = true; };
 
-            isPlaying = false;
-            document.getElementById('btn-play-anim').innerText = '▶ 播放';
-            isRenderingVideo = true;
-            cancelRender = false;
+            isPlaying = false; document.getElementById('btn-play-anim').innerText = '▶ 播放';
+            isRenderingVideo = true; cancelRender = false;
 
-            const outWidth = 1280;
-            const outHeight = 720;
-            const fps = 30; 
-            
-            const duration = (lastMaxKeyframe + 1) / 20; 
-            const totalFrames = Math.floor(duration * fps); 
+            const outWidth = 1280; const outHeight = 720; const fps = 30; 
+            const duration = (lastMaxKeyframe + 1) / 20; const totalFrames = Math.floor(duration * fps); 
 
-            const exportCamera = camera.clone();
-            exportCamera.aspect = outWidth / outHeight;
-            exportCamera.updateProjectionMatrix();
+            const exportCamera = camera.clone(); exportCamera.aspect = outWidth / outHeight; exportCamera.updateProjectionMatrix();
+            if (sceneCamera) { sceneCamera.aspect = outWidth / outHeight; sceneCamera.updateProjectionMatrix(); }
 
-            if (sceneCamera) {
-                sceneCamera.aspect = outWidth / outHeight;
-                sceneCamera.updateProjectionMatrix();
-            }
-
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = outWidth;
-            tempCanvas.height = outHeight;
+            const tempCanvas = document.createElement('canvas'); tempCanvas.width = outWidth; tempCanvas.height = outHeight;
             const ctx = tempCanvas.getContext('2d', { willReadFrequently: true });
 
             try {
-                const muxer = new Mp4Muxer.Muxer({
-                    target: new Mp4Muxer.ArrayBufferTarget(),
-                    video: { codec: 'avc', width: outWidth, height: outHeight },
-                    fastStart: 'in-memory'
-                });
-
-                const videoEncoder = new VideoEncoder({
-                    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-                    error: e => { throw new Error("编码器崩溃: " + e.message); }
-                });
-
-                videoEncoder.configure({
-                    codec: 'avc1.42001f', 
-                    width: outWidth,
-                    height: outHeight,
-                    bitrate: 2_500_000, 
-                    framerate: fps
-                });
+                const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: 'avc', width: outWidth, height: outHeight }, fastStart: 'in-memory' });
+                const videoEncoder = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: e => { throw new Error("编码器崩溃: " + e.message); } });
+                videoEncoder.configure({ codec: 'avc1.42001f', width: outWidth, height: outHeight, bitrate: 2_500_000, framerate: fps });
 
                 for (let frame = 0; frame < totalFrames; frame++) {
                     if (cancelRender) throw new Error("用户取消了渲染");
-
                     const timeInSeconds = frame / fps;
                     let animFrame = Math.round(timeInSeconds * 20);
                     if (animFrame > lastMaxKeyframe) animFrame = lastMaxKeyframe;
@@ -1235,91 +2342,58 @@
                     applyAnimationState(animFrame);
                     
                     if (isInsideCamera && sceneCamera) {
-                        sceneCamera.aspect = outWidth / outHeight;
-                        sceneCamera.updateProjectionMatrix();
-                        composer.passes[0].camera = sceneCamera;
+                        sceneCamera.aspect = outWidth / outHeight; sceneCamera.updateProjectionMatrix(); composer.passes[0].camera = sceneCamera;
                     } else if (sceneCamera) {
-                        sceneCamera.aspect = outWidth / outHeight;
-                        sceneCamera.updateProjectionMatrix();
-                        composer.passes[0].camera = sceneCamera;
-                    } else {
-                        composer.passes[0].camera = exportCamera;
-                    }
+                        sceneCamera.aspect = outWidth / outHeight; sceneCamera.updateProjectionMatrix(); composer.passes[0].camera = sceneCamera;
+                    } else { composer.passes[0].camera = exportCamera; }
                     composer.render();
                     
                     ctx.drawImage(renderer.domElement, 0, 0, outWidth, outHeight);
-
                     await new Promise(r => requestAnimationFrame(r));
 
-                    while (videoEncoder.encodeQueueSize > 3) {
-                        await new Promise(r => setTimeout(r, 20));
-                    }
-
-                    if (videoEncoder.state === 'closed') {
-                        throw new Error("手机系统强行关闭了编码器，请尝试重启浏览器并清空后台。");
-                    }
+                    while (videoEncoder.encodeQueueSize > 3) { await new Promise(r => setTimeout(r, 20)); }
+                    if (videoEncoder.state === 'closed') throw new Error("手机系统强行关闭了编码器，请尝试清空后台。");
 
                     const timestamp = (frame * 1_000_000) / fps;
                     const videoFrame = new VideoFrame(tempCanvas, { timestamp });
                     videoEncoder.encode(videoFrame, { keyFrame: frame % 30 === 0 });
-                    
-                    videoFrame.close();
-                    ctx.clearRect(0, 0, outWidth, outHeight);
-
+                    videoFrame.close(); ctx.clearRect(0, 0, outWidth, outHeight);
                     await new Promise(r => setTimeout(r, 10));
                 }
 
                 document.getElementById('render-text').innerText = '正在封装 MP4 数据...';
                 document.getElementById('render-bar').style.width = `100%`;
 
-                await videoEncoder.flush();
-                videoEncoder.close();
-                muxer.finalize();
+                await videoEncoder.flush(); videoEncoder.close(); muxer.finalize();
 
                 const { buffer } = muxer.target;
-                const blob = new Blob([buffer], { type: 'video/mp4' });
-                const url = URL.createObjectURL(blob);
-                
-                const safeBlob = new Blob([blob], { type: 'application/octet-stream' });
-                const safeUrl = URL.createObjectURL(safeBlob);
+                const blob = new Blob([buffer], { type: 'video/mp4' }); const url = URL.createObjectURL(blob);
+                const safeBlob = new Blob([blob], { type: 'application/octet-stream' }); const safeUrl = URL.createObjectURL(safeBlob);
                 const fileName = `E.S_Video_${Date.now()}.esmp4`;
 
                 document.getElementById('render-modal').style.display = 'none';
 
                 const overlay = document.createElement('div');
                 overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;";
-                
                 overlay.innerHTML = `
                     <div style="background:#222; padding:20px; border-radius:12px; text-align:center; max-width:500px; width:100%; border:1px solid #444;">
                         <h3 style="color:#4caf50; margin-top:0;">导出成功！</h3>
                         <video src="${url}" controls style="max-width:100%; max-height:50vh; border-radius:8px; margin-bottom:20px;"></video>
-                        
-                        <a href="${safeUrl}" download="${fileName}" style="display:block; width:100%; padding:12px; background:#0055aa; color:white; text-decoration:none; border-radius:6px; font-weight:bold; box-sizing:border-box; margin-bottom:10px;">
-                            ⬇️ 点击保存视频 (保存后改回 .mp4)
-                        </a>
+                        <a href="${safeUrl}" download="${fileName}" style="display:block; width:100%; padding:12px; background:#0055aa; color:white; text-decoration:none; border-radius:6px; font-weight:bold; box-sizing:border-box; margin-bottom:10px;">⬇️ 点击保存视频 (保存后改回 .mp4)</a>
                         <button id="btn-close-export" style="width:100%; padding:10px; background:#444; color:white; border:none; border-radius:6px; cursor:pointer;">关闭</button>
                     </div>
                 `;
                 document.body.appendChild(overlay);
-                document.getElementById('btn-close-export').onclick = () => document.body.removeChild(overlay);
+                document.getElementById('btn-close-export').onclick = () => { URL.revokeObjectURL(url); URL.revokeObjectURL(safeUrl); document.body.removeChild(overlay); };
 
             } catch (err) {
-                console.error(err);
-                alert("视频导出中断: " + err.message);
-                document.getElementById('render-modal').style.display = 'none';
+                console.error(err); alert("视频导出中断: " + err.message); document.getElementById('render-modal').style.display = 'none';
             } finally {
-                isRenderingVideo = false;
-                applyAnimationState(currentFrame);
-                window.addEventListener('resize', onWindowResize);
-                setTimeout(onWindowResize, 100);
+                isRenderingVideo = false; applyAnimationState(currentFrame); window.addEventListener('resize', onWindowResize); setTimeout(onWindowResize, 100);
             }
         });
 
-        function formatTime(val) {
-            const h = Math.floor(val);
-            const m = Math.floor((val - h) * 60);
-            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-        }
+        function formatTime(val) { const h = Math.floor(val); const m = Math.floor((val - h) * 60); return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`; }
     </script>
 </body>
 </html>
