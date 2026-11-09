@@ -1558,7 +1558,12 @@
                     const suffixMatch = uniqueName.match(/(_\d+)$/); const suffix = suffixMatch ? suffixMatch[0] : '';
                     applyNameSuffixToHierarchy(group, suffix);
                     
-                    const modelRecord = { id: generateUniqueId(), group, name: uniqueName };
+                    const modelRecord = { 
+                        id: generateUniqueId(), 
+                        group, 
+                        name: uniqueName,
+                        rawBuffer: e.target.result // 👈 把文件的 ArrayBuffer 存入了记录
+                    };
                     loadedModels.push(modelRecord);
                     refreshModelBoneList(modelRecord);
                     registerModelTextures(group, uniqueName);
@@ -2100,7 +2105,17 @@
                 lastMaxKeyframe: lastMaxKeyframe,
                 currentFrame: currentFrame,
                 locators: [],
-                customParticles: []
+                customParticles: [],
+                models: [],
+                cameraData: sceneCamera ? {
+                    pos: sceneCamera.position.toArray(),
+                    rot: sceneCamera.rotation.toArray(),
+                    fov: sceneCamera.fov
+                } : null,
+                lights: sceneLights.map(l => ({
+                    id: l.id, type: l.light.type, name: l.name, color: l.color, intensity: l.intensity, dist: l.dist, decay: l.decay,
+                    pos: l.light.position.toArray()
+                }))
             };
 
             scene.traverse(c => {
@@ -2137,6 +2152,15 @@
                 }
             }
 
+            const modelFolder = zip.folder("models");
+            for (let i = 0; i < loadedModels.length; i++) {
+                const m = loadedModels[i];
+                if (m.rawBuffer) {
+                    modelFolder.file(`model_${i}.glb`, m.rawBuffer);
+                    projectData.models.push({ file: `model_${i}.glb`, name: m.name, id: m.id });
+                }
+            }
+
             zip.file("project.json", JSON.stringify(projectData, null, 2));
 
             const content = await zip.generateAsync({ type: "blob" });
@@ -2167,6 +2191,78 @@
                 lastMaxKeyframe = projectData.lastMaxKeyframe; 
                 currentFrame = projectData.currentFrame;
                 updatePlayhead();
+
+                if (projectData.models && projectData.models.length > 0) {
+                    const loader = new GLTFLoader();
+                    for (let mData of projectData.models) {
+                        const modelZipFile = zipContent.file(`models/${mData.file}`);
+                        if (modelZipFile) {
+                            const arrayBuffer = await modelZipFile.async("arraybuffer");
+                            await new Promise((resolve) => {
+                                loader.parse(arrayBuffer, '', (gltf) => {
+                                    const group = gltf.scene;
+                                    group.traverse((child) => { 
+                                        if (child.isMesh) { 
+                                            child.castShadow = true; child.receiveShadow = true; 
+                                            pbrMaterialMap.set(child, child.material);
+                                            const mats = Array.isArray(child.material) ? child.material : [child.material];
+                                            mats.forEach(m => {
+                                                if (typeof m.opacity !== 'number' || isNaN(m.opacity) || m.opacity <= 0) m.opacity = 1;
+                                                if (m.opacity >= 1.0) m.transparent = false;
+                                                if (m.metalness === undefined) m.metalness = 0;
+                                                if (m.roughness === undefined) m.roughness = 0.5;
+                                            });
+                                        } 
+                                    });
+                                    scene.add(group);
+                                    
+                                    const modelRecord = { id: mData.id, group, name: mData.name, rawBuffer: arrayBuffer };
+                                    loadedModels.push(modelRecord);
+                                    refreshModelBoneList(modelRecord);
+                                    registerModelTextures(group, mData.name);
+                                    
+                                    let hasSkinned = false; group.traverse(c => { if(c.isSkinnedMesh) hasSkinned = true; });
+                                    if (hasSkinned) {
+                                        group.traverse(c => {
+                                            if (c.isSkinnedMesh && c.skeleton) {
+                                                let rootBone = c.skeleton.bones[0]; while(rootBone.parent && rootBone.parent.isBone) rootBone = rootBone.parent;
+                                                const lineHelper = new THREE.SkeletonHelper(rootBone); lineHelper.material.depthTest = false; lineHelper.material.color.setHex(0xffffff); scene.add(lineHelper); boneVisuals.push(lineHelper);
+                                                rootBone.traverse(bone => { if(bone.isBone) { const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.06), new THREE.MeshBasicMaterial({ color: 0x00aaff, depthTest: false, transparent: true, opacity: 0.8 })); m.userData.isBoneNode = true; m.userData.bone = bone; bone.add(m); boneVisuals.push(m); } });
+                                            }
+                                        });
+                                    }
+                                    resolve();
+                                });
+                            });
+                        }
+                    }
+                }
+
+                if (projectData.cameraData) {
+                    if (!sceneCamera) {
+                        sceneCamera = new THREE.PerspectiveCamera(40, canvasContainer.clientWidth / canvasContainer.clientHeight, 0.1, 5000); scene.add(sceneCamera);
+                        sceneCameraHelper = new THREE.CameraHelper(sceneCamera); scene.add(sceneCameraHelper); boneVisuals.push(sceneCameraHelper); sceneCameraHelper.userData.isCameraHelper = true;
+                    }
+                    sceneCamera.position.fromArray(projectData.cameraData.pos);
+                    sceneCamera.rotation.fromArray(projectData.cameraData.rot);
+                    sceneCamera.fov = projectData.cameraData.fov;
+                    sceneCamera.updateProjectionMatrix();
+                    if(sceneCameraHelper) sceneCameraHelper.update();
+                    document.getElementById('cam-fov-group').style.display = 'block';
+                    document.getElementById('slider-cam-fov').value = sceneCamera.fov;
+                    document.getElementById('val-cam-fov').innerText = sceneCamera.fov;
+                }
+
+                if (projectData.lights) {
+                    projectData.lights.forEach(lData => {
+                        createLightUI(lData.type === 'DirectionalLight' ? 'dir' : (lData.type === 'PointLight' ? 'point' : 'spot'));
+                        const l = sceneLights[sceneLights.length - 1];
+                        l.id = lData.id; l.name = lData.name; l.color = lData.color; l.intensity = lData.intensity; l.dist = lData.dist || 200; l.decay = lData.decay || 2.0;
+                        l.light.color.set(lData.color); l.light.intensity = lData.intensity; l.light.distance = l.dist; l.light.decay = l.decay;
+                        l.light.position.fromArray(lData.pos);
+                    });
+                    updateLightList();
+                }
 
                 if (projectData.locators && projectData.locators.length > 0) {
                     projectData.locators.forEach(locData => {
