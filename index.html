@@ -1100,7 +1100,7 @@
                                     shader.fragmentShader = shader.fragmentShader.replace(/void\s+main\s*\(\s*\)\s*\{/, `uniform float u_saturation;\nuniform float u_contrast;\nuniform float u_emissiveIntensity;\nuniform float u_useFallback;\nvoid main() {`);
                                     shader.fragmentShader = shader.fragmentShader.replace('#include <dithering_fragment>', `#include <dithering_fragment>\nfloat gray = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114));\ngl_FragColor.rgb = mix(vec3(gray), gl_FragColor.rgb, u_saturation);\ngl_FragColor.rgb = (gl_FragColor.rgb - 0.5) * u_contrast + 0.5;`);
                                     shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#ifdef USE_EMISSIVEMAP\nvec4 emissiveMaskColor = texture2D( emissiveMap, vEmissiveMapUv );\nfloat maskLum = dot(emissiveMaskColor.rgb, vec3(0.299, 0.587, 0.114));\nvec3 baseColor = vec3(1.0);\n#ifdef USE_MAP\nbaseColor = texture2D( map, vMapUv ).rgb;\n#endif\ntotalEmissiveRadiance = baseColor * maskLum * u_emissiveIntensity;\n#endif`);
-                                    shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `#ifdef USE_NORMALMAP\nvec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;\nmapN.xy *= normalScale;\nif (u_useFallback > 0.5) {\nvec3 q0 = dFdx( vViewPosition ); vec3 q1 = dFdy( vViewPosition );\nvec2 st0 = dFdx( vNormalMapUv.st ); vec2 st1 = dFdy( vNormalMapUv.st );\nvec3 N = normalize( vNormal );\nvec3 q1perp = cross( q1, N ); vec3 q0perp = cross( N, q0 );\nvec3 T = q1perp * st0.x + q0perp * st1.x;\nvec3 B = q1perp * st0.y + q0perp * st1.y;\nfloat det = max( dot( T, T ), dot( B, B ) );\nfloat scale = ( det == 0.0 ) ? 0.0 : inversesqrt( det );\nT *= scale; B *= scale;\nnormal = normalize( T * mapN.x + B * mapN.y + N * mapN.z );\n} else { normal = normalize( tbn * mapN ); }\n#endif`);
+                     // 保留原版 6767
                                 };
                                 mat.needsUpdate = true;
                             }
@@ -1594,7 +1594,7 @@
 
             if (isAnimMode && isPlaying) { 
                 const elapsed = (performance.now() - playStartTime) / 1000; 
-                currentFrame = Math.floor(elapsed * 20); 
+                currentFrame = Math.floor(elapsed * 30); 
                 if (currentFrame > lastMaxKeyframe) {
                     currentFrame = 0;
                     playStartTime = performance.now();
@@ -1605,7 +1605,7 @@
 
             // 🌟 实时物理引擎，保持原有动感
             activeParticleInstances.forEach(sys => {
-                sys.life += 0.016;
+    sys.life += (1.0 / 30.0); // 👈 完美对齐 30 帧ys.life += 0.016;
                 
                 if (sys.mesh.material.userData.uvTime) {
                     sys.mesh.material.userData.uvTime.value = sys.life;
@@ -1635,16 +1635,16 @@
                     }
                 } else {
                     for (let i = 0; i < positions.length / 3; i++) {
-                        positions[i * 3] += sys.velocities[i].x * 0.016;
-                        positions[i * 3 + 1] += sys.velocities[i].y * 0.016;
-                        positions[i * 3 + 2] += sys.velocities[i].z * 0.016;
+                        positions[i * 3] += sys.velocities[i].x * (1.0 / 30.0);
+                        positions[i * 3 + 1] += sys.velocities[i].y * (1.0 / 30.0);
+                        positions[i * 3 + 2] += sys.velocities[i].z * (1.0 / 30.0);
                         
-                        sys.velocities[i].y += sys.gravity * 0.016;
+                        sys.velocities[i].y += sys.gravity * (1.0 / 30.0);
                         
                         if (sys.wind) {
-                            sys.velocities[i].x += sys.wind.x * 0.016;
-                            sys.velocities[i].y += sys.wind.y * 0.016;
-                            sys.velocities[i].z += sys.wind.z * 0.016;
+                            sys.velocities[i].x += sys.wind.x * (1.0 / 30.0);
+                            sys.velocities[i].y += sys.wind.y * (1.0 / 30.0);
+                            sys.velocities[i].z += sys.wind.z * (1.0 / 30.0);
                         }
                         
                         sys.velocities[i].x *= sys.drag;
@@ -1667,9 +1667,9 @@
                 sys.mesh.position.x = camera.position.x;
                 sys.mesh.position.z = camera.position.z;
                 for (let i = 0; i < positions.length / 3; i++) {
-                    positions[i * 3] += sys.velocities[i].x * 0.016;
-                    positions[i * 3 + 1] += sys.velocities[i].y * 0.016;
-                    positions[i * 3 + 2] += sys.velocities[i].z * 0.016;
+                    positions[i * 3] += sys.velocities[i].x * (1.0 / 30.0);
+                    positions[i * 3 + 1] += sys.velocities[i].y * (1.0 / 30.0);
+                    positions[i * 3 + 2] += sys.velocities[i].z * (1.0 / 30.0);
                     if (positions[i * 3 + 1] < -10) {
                         positions[i * 3 + 1] = sys.height;
                         positions[i * 3] = (Math.random() - 0.5) * sys.range;
@@ -1927,7 +1927,7 @@
                 setTimeout(() => {
                     if (!isPlaying && currentFrame < vfxDesc.startFrame) return; 
                     createAndAddVfxInstance(locator, asset, vfxDesc);
-                }, (vfxDesc.delay / 20) * 1000);
+                }, (vfxDesc.delay / 30) * 1000);
             } else {
                 createAndAddVfxInstance(locator, asset, vfxDesc);
             }
@@ -2036,7 +2036,7 @@
         document.getElementById('btn-play-anim').onclick = () => { 
             isPlaying = !isPlaying; 
             document.getElementById('btn-play-anim').innerText = isPlaying ? '⏸ 暂停' : '▶ 播放'; 
-            if(isPlaying) { playStartTime = performance.now() - (currentFrame / 20) * 1000; } 
+            if(isPlaying) { playStartTime = performance.now() - (currentFrame / 30) * 1000; } 
         };
 
         function createLightUI(type) {
@@ -2459,7 +2459,7 @@
             isRenderingVideo = true; cancelRender = false;
 
             const outWidth = 1280; const outHeight = 720; const fps = 30; 
-            const duration = (lastMaxKeyframe + 1) / 20; const totalFrames = Math.floor(duration * fps); 
+            const duration = (lastMaxKeyframe + 1) / 30; const totalFrames = Math.floor(duration * fps); 
 
             const exportCamera = camera.clone(); exportCamera.aspect = outWidth / outHeight; exportCamera.updateProjectionMatrix();
             if (sceneCamera) { sceneCamera.aspect = outWidth / outHeight; sceneCamera.updateProjectionMatrix(); }
@@ -2475,7 +2475,7 @@
                 for (let frame = 0; frame < totalFrames; frame++) {
                     if (cancelRender) throw new Error("用户取消了渲染");
                     const timeInSeconds = frame / fps;
-                    let animFrame = Math.round(timeInSeconds * 20);
+                    let animFrame = Math.round(timeInSeconds * 30);
                     if (animFrame > lastMaxKeyframe) animFrame = lastMaxKeyframe;
 
                     const progress = Math.floor((frame / totalFrames) * 100);
