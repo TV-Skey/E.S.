@@ -51,6 +51,7 @@
         .tree-children { padding-left: 12px; border-left: 1px dashed #333; margin-left: 6px; display: none; }
         .tree-children.open { display: block; }
         #toggle-outliner-btn { position: absolute; top: 15px; right: 15px; z-index: 101; background: rgba(15, 15, 15, 0.9); color: white; border: 1px solid #555; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); font-weight: bold;}
+        #btn-multi-select { position: absolute; top: 15px; right: 130px; z-index: 101; background: rgba(15, 15, 15, 0.9); color: white; border: 1px solid #555; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); font-weight: bold;}
         #timeline-panel { height: 260px; background: #151515; border-top: 1px solid #333; display: none; flex-direction: column; transition: height 0.2s; }
         #timeline-header { height: 40px; display: flex; align-items: center; padding: 0 15px; gap: 15px; background: #1a1a1a; border-bottom: 1px solid #333; }
         #timeline-body { flex: 1; display: flex; overflow: hidden; position: relative; }
@@ -308,6 +309,7 @@
             </div>
         </div>
 
+        <button id="btn-multi-select">🔗 多选绑定</button>
         <button id="toggle-outliner-btn">📑 切换大纲</button>
     </div>
 
@@ -433,6 +435,8 @@
         let isPortraitPreview = false;
         let bounceThreshold = 6; 
         let bounceStrength = 1.7; 
+        let isMultiSelectMode = false;
+        let multiSelectedNodes = [];
 
         const FXShader = {
             uniforms: {
@@ -524,16 +528,14 @@
         let activeEditTexture = null;
         let isEditMode = false;
 
-        // 🌟 粒子与特效系统全局变量
         let loadedParticleAssets = []; 
         let activeParticleInstances = []; 
         let particleGravity = -9.8;
         let particleSize = 0.5;
         let particleTrail = 1.0;
-        let particleLoop = true; // 🌟 循环开关
+        let particleLoop = true; 
         let globalWeatherSystem = null; 
 
-        // 🌟 大纲里当前选中的粒子模板（用于绑定）
         let selectedVfxAsset = null; 
         let activeLocatorVfx = []; 
 
@@ -750,7 +752,64 @@
         document.getElementById('btn-mode-anim').onclick = () => setMode('anim');
         document.getElementById('btn-mode-edit').onclick = () => setMode('edit');
 
-        // ==================== 程序化生成高级贴图 (无需外部上传) ====================
+        const btnMulti = document.getElementById('btn-multi-select');
+        btnMulti.onclick = () => {
+            if (multiSelectedNodes.length === 2) {
+                const child = multiSelectedNodes[0];
+                const parent = multiSelectedNodes[1];
+                
+                let isChild = false; let check = parent;
+                while (check) { if (check === child) { isChild = true; break; } check = check.parent; }
+                if (isChild) return alert("不能循环绑定！");
+
+                const childType = child.isCamera ? "摄像机" : "模型/物体";
+                const parentType = parent.isCamera ? "摄像机" : "模型/物体";
+
+                if (confirm(`确认将 [${child.name || childType}] 绑定到 [${parent.name || parentType}] 底下吗？`)) {
+                    const worldPos = new THREE.Vector3();
+                    const worldQuat = new THREE.Quaternion();
+                    child.getWorldPosition(worldPos);
+                    child.getWorldQuaternion(worldQuat);
+                    
+                    const originalScale = child.getWorldScale(new THREE.Vector3());
+                    
+                    child.removeFromParent();
+                    parent.add(child);
+                    parent.updateMatrixWorld(true);
+
+                    child.position.copy(parent.worldToLocal(worldPos.clone()));
+                    const pQuat = new THREE.Quaternion();
+                    parent.getWorldQuaternion(pQuat);
+                    child.quaternion.copy(pQuat.invert().multiply(worldQuat));
+
+                    if (parent.isBone || parent.isCamera) {
+                        const s = parent.getWorldScale(new THREE.Vector3());
+                        child.scale.set(originalScale.x / s.x, originalScale.y / s.y, originalScale.z / s.z);
+                    }
+                    
+                    statusText.innerText = `✅ 成功绑定: ${child.name || childType} -> ${parent.name || parentType}`;
+                    buildOutliner();
+                }
+                
+                isMultiSelectMode = false;
+                multiSelectedNodes = [];
+                btnMulti.innerText = "🔗 多选绑定";
+                btnMulti.style.background = "rgba(15, 15, 15, 0.9)";
+                buildOutliner();
+            } else {
+                isMultiSelectMode = !isMultiSelectMode;
+                multiSelectedNodes = [];
+                if (isMultiSelectMode) {
+                    btnMulti.innerText = "0/2 选中";
+                    btnMulti.style.background = "#0055aa";
+                } else {
+                    btnMulti.innerText = "🔗 多选绑定";
+                    btnMulti.style.background = "rgba(15, 15, 15, 0.9)";
+                }
+                buildOutliner();
+            }
+        };
+
         function generateParticleTexture(type) {
             const canvas = document.createElement('canvas');
             canvas.width = 128; canvas.height = 128;
@@ -781,7 +840,6 @@
         const defaultExplosionTex = generateParticleTexture('explosion');
         const defaultDotTex = generateParticleTexture('dot');
 
-        // ==================== 粒子与特效系统 ====================
         document.getElementById('slider-part-gravity').addEventListener('input', (e) => {
             particleGravity = parseFloat(e.target.value);
             document.getElementById('val-part-gravity').innerText = particleGravity;
@@ -791,7 +849,7 @@
             particleSize = parseFloat(e.target.value);
             document.getElementById('val-part-size').innerText = particleSize;
             activeParticleInstances.forEach(inst => {
-                if(inst.mesh) inst.mesh.material.size = particleSize * 10; // 补偿缩放
+                if(inst.mesh) inst.mesh.material.size = particleSize * 10;
             });
         });
 
@@ -853,11 +911,10 @@
                 opacity: 1.0,
                 alphaTest: 0.01,         
                 blending: blendMode,
-                depthWrite: false,       // 🌟 防穿帮核心：关闭深度写入
-                depthTest: true          // 🌟 防穿帮核心：恢复深度测试，该被遮挡就被遮挡
+                depthWrite: false,       
+                depthTest: true          
             });
 
-            // 处理拖尾和 UV 图集
             const uvGrid = texture.userData.uvGrid || [1, 1];
             material.userData.trailLength = { value: particleTrail };
             material.userData.uvGrid = { value: new THREE.Vector2(uvGrid[0], uvGrid[1]) };
@@ -914,7 +971,6 @@
                 mesh, velocities, life: 0, maxLife: config.lifetime || 2.0, 
                 wind: new THREE.Vector3(config.physics?.wind?.[0]||0, config.physics?.wind?.[1]||0, config.physics?.wind?.[2]||0),
                 drag: config.physics?.drag !== undefined ? config.physics.drag : 0.98,
-                // 🌟 接口开放 2：读取 JSON 里的独立重力
                 gravity: config.physics?.gravity !== undefined ? config.physics.gravity : particleGravity,
                 colStart: colStart, colEnd: colEnd,
                 assetName: config.name || "未知特效",
@@ -923,7 +979,6 @@
             };
         }
 
-        // 🌟 放置粒子到场景（支持作为独立实体，或者绑定到骨骼）
         function placeParticleInstance(asset, bindToNode = null) {
             if (!asset.meshInstance) {
                 const instData = createParticleMesh(asset.config, asset.texture);
@@ -944,7 +999,6 @@
             buildOutliner();
         }
 
-        // 🌟 解析 .espart 包（超强容错版）
         document.getElementById('espart-input').addEventListener('change', async (e) => {
             const file = e.target.files[0]; if (!file) return;
             statusText.innerText = "正在解析 .espart 资源包...";
@@ -963,11 +1017,9 @@
                 const data = JSON.parse(await zipContent.file(jsonPath).async("string"));
 
                 let imgPath = null;
-                // 🌟 优先读取 JSON 里指定的贴图路径
                 if (data.texture && zipContent.file(data.texture)) {
                     imgPath = data.texture;
                 } else {
-                    // 如果没写或者写错了，再暴力搜索
                     for (let path in zipContent.files) {
                         if (!zipContent.files[path].dir && (path.endsWith('.png') || path.endsWith('.jpg'))) {
                             imgPath = path;
@@ -1007,7 +1059,6 @@
         };
 
         document.getElementById('btn-add-fire').onclick = () => {
-            // 🌟 火煋：向四周散开，负重力往下掉
             const fireConfig = { 
                 name: "火煋", 
                 quantity: 400, 
@@ -1015,11 +1066,11 @@
                 size: 0.3, 
                 explode: false, 
                 physics: { 
-                    speed: 6.0,      // 往外冲
-                    spread: 3.0,     // 散开更宽
-                    drag: 0.96,      // 空气阻力
-                    gravity: -9.8,   // 往下掉
-                    wind: [0, 0, 0]  // 无风
+                    speed: 6.0,      
+                    spread: 3.0,     
+                    drag: 0.96,      
+                    gravity: -9.8,   
+                    wind: [0, 0, 0]  
                 }, 
                 colorStart: "#ffdd55", 
                 colorEnd: "#ff0000",
@@ -1047,7 +1098,6 @@
             activeParticleInstances = []; loadedParticleAssets = []; selectedVfxAsset = null; buildOutliner(); statusText.innerText = "场景内所有粒子已清空";
         };
 
-        // 天气系统
         function setWeather(type) {
             if (globalWeatherSystem) { scene.remove(globalWeatherSystem.mesh); globalWeatherSystem.mesh.geometry.dispose(); globalWeatherSystem.mesh.material.dispose(); globalWeatherSystem = null; }
             if (type === 'off') { statusText.innerText = "天气晴朗"; return; }
@@ -1100,7 +1150,6 @@
                                     shader.fragmentShader = shader.fragmentShader.replace(/void\s+main\s*\(\s*\)\s*\{/, `uniform float u_saturation;\nuniform float u_contrast;\nuniform float u_emissiveIntensity;\nuniform float u_useFallback;\nvoid main() {`);
                                     shader.fragmentShader = shader.fragmentShader.replace('#include <dithering_fragment>', `#include <dithering_fragment>\nfloat gray = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114));\ngl_FragColor.rgb = mix(vec3(gray), gl_FragColor.rgb, u_saturation);\ngl_FragColor.rgb = (gl_FragColor.rgb - 0.5) * u_contrast + 0.5;`);
                                     shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#ifdef USE_EMISSIVEMAP\nvec4 emissiveMaskColor = texture2D( emissiveMap, vEmissiveMapUv );\nfloat maskLum = dot(emissiveMaskColor.rgb, vec3(0.299, 0.587, 0.114));\nvec3 baseColor = vec3(1.0);\n#ifdef USE_MAP\nbaseColor = texture2D( map, vMapUv ).rgb;\n#endif\ntotalEmissiveRadiance = baseColor * maskLum * u_emissiveIntensity;\n#endif`);
-                     // 保留原版 6767
                                 };
                                 mat.needsUpdate = true;
                             }
@@ -1251,7 +1300,6 @@
         document.getElementById('btn-translate').onclick = () => transformControls.setMode('translate'); document.getElementById('btn-rotate').onclick = () => transformControls.setMode('rotate'); document.getElementById('btn-scale').onclick = () => transformControls.setMode('scale');
         document.getElementById('btn-toggle-skeleton').onclick = () => { showSkeleton = !showSkeleton; boneVisuals.forEach(obj => { obj.visible = showSkeleton; }); };
 
-        // 🌟 核心新增：生成自定义定位器（Empty Object）
         document.getElementById('btn-add-locator').onclick = () => {
             if (!selectedNode) return alert("请先在右侧大纲或场景中选中一个骨骼！");
             if (!selectedNode.isBone && !selectedNode.isGroup && !selectedNode.isMesh) {
@@ -1307,7 +1355,6 @@
             if (sceneCamera) { const camNode = createTreeNode(sceneCamera, false, "🎥 预设摄像机"); camNode.querySelector('span:last-child').style.color = "#e91e63"; treeView.appendChild(camNode); }
             loadedModels.forEach(model => { treeView.appendChild(createTreeNode(model.group, true)); });
 
-            // 渲染粒子库
             if (loadedParticleAssets.length > 0) {
                 const vfxWrapper = document.createElement('div');
                 vfxWrapper.style.marginTop = "15px";
@@ -1327,7 +1374,6 @@
                 treeView.appendChild(vfxWrapper);
             }
 
-            // 渲染活动特效实例
             if (activeParticleInstances.length > 0) {
                 const activeWrapper = document.createElement('div');
                 activeWrapper.style.marginTop = "15px";
@@ -1379,6 +1425,14 @@
             const wrapper = document.createElement('div'); const row = document.createElement('div');
             row.className = 'tree-node'; if (selectedNode === obj) row.classList.add('active');
             
+            if (multiSelectedNodes.includes(obj)) { 
+                row.style.border = "1px solid #4caf50"; 
+                row.style.backgroundColor = "rgba(76, 175, 80, 0.2)"; 
+            } else { 
+                row.style.border = "none"; 
+                row.style.backgroundColor = ""; 
+            }
+
             let icon = '📦'; let name = forceName;
             if (!name) {
                 if (isRoot) { const model = loadedModels.find(m => m.group === obj); name = model ? model.name : (obj.name || '未知模型'); }
@@ -1414,6 +1468,14 @@
                 const draggedObj = window.draggedNode;
                 if (!draggedObj || draggedObj === obj) return;
 
+                let isChildOfDragged = false;
+                let checkNode = obj;
+                while (checkNode) {
+                    if (checkNode === draggedObj) { isChildOfDragged = true; break; }
+                    checkNode = checkNode.parent;
+                }
+                if (isChildOfDragged) return alert("不能将父节点挂载到自己的子节点下！");
+
                 if (draggedObj.userData.isVfxMesh) {
                     if (obj.isBone || obj.isGroup || obj.isMesh || obj.userData.isLocator) {
                         let vfxController = obj.userData.vfxController;
@@ -1430,6 +1492,43 @@
                         statusText.innerText = `成功将特效绑定至: ${name}`;
                         buildOutliner(); 
                     }
+                    return;
+                }
+
+                const isDraggedModel = loadedModels.some(m => m.group === draggedObj);
+                const isDraggedCamera = draggedObj.isCamera;
+                const isTargetValid = obj.isBone || obj.isGroup || obj.isMesh || obj.isCamera || obj.userData.isLocator;
+
+                if (!isTargetValid) return;
+
+                let targetType = obj.isCamera ? "摄像机" : (obj.isBone ? "骨骼" : (obj.isGroup ? "分组" : "模型/物体"));
+                let draggedType = isDraggedCamera ? "摄像机" : (isDraggedModel ? "模型" : "物体");
+
+                if ((isDraggedModel || isDraggedCamera) && confirm(`是否需要将 [${draggedType}: ${draggedObj.name || '未知'}] 挂载到 [${targetType}: ${name}] 底下？`)) {
+                    const worldPos = new THREE.Vector3();
+                    const worldQuat = new THREE.Quaternion();
+                    draggedObj.getWorldPosition(worldPos);
+                    draggedObj.getWorldQuaternion(worldQuat);
+                    
+                    const originalScale = draggedObj.getWorldScale(new THREE.Vector3());
+                    
+                    draggedObj.removeFromParent();
+                    obj.add(draggedObj);
+                    obj.updateMatrixWorld(true);
+
+                    draggedObj.position.copy(obj.worldToLocal(worldPos.clone()));
+                    const parentWorldQuat = new THREE.Quaternion();
+                    obj.getWorldQuaternion(parentWorldQuat);
+                    draggedObj.quaternion.copy(parentWorldQuat.invert().multiply(worldQuat));
+
+                    if (obj.isBone || obj.isCamera) {
+                        const s = obj.getWorldScale(new THREE.Vector3());
+                        draggedObj.scale.set(originalScale.x / s.x, originalScale.y / s.y, originalScale.z / s.z);
+                    }
+                    
+                    statusText.innerText = `✅ 成功挂载: ${draggedType} -> ${targetType}`;
+                    if (isDraggedModel) refreshModelBoneList(loadedModels.find(m => m.group === draggedObj) || loadedModels[0]);
+                    buildOutliner();
                 }
             };
 
@@ -1481,6 +1580,28 @@
             }
             
             row.onclick = () => {
+                if (isMultiSelectMode) {
+                    const isTargetValid = obj.isBone || obj.isGroup || obj.isMesh || obj.isCamera || (loadedModels.some(m => m.group === obj));
+                    if (!isTargetValid) return alert("只能选模型、骨骼、分组或摄像机！");
+
+                    if (multiSelectedNodes.includes(obj)) {
+                        multiSelectedNodes = multiSelectedNodes.filter(n => n !== obj);
+                    } else {
+                        multiSelectedNodes.push(obj);
+                    }
+                    
+                    btnMulti.innerText = `${multiSelectedNodes.length}/2 选中`;
+                    if (multiSelectedNodes.length === 2) {
+                        btnMulti.innerText = "🔗 执行绑定";
+                        btnMulti.style.background = "#4caf50";
+                    } else {
+                        btnMulti.style.background = "#0055aa";
+                    }
+                    
+                    buildOutliner();
+                    return; 
+                }
+
                 document.querySelectorAll('.tree-node').forEach(n => n.classList.remove('active')); row.classList.add('active');
                 selectedNode = obj; selectedLight = null; document.getElementById('light-props').style.display = 'none'; updateLightList();
                 if (!isInsideCamera) transformControls.attach(selectedNode);
@@ -1539,6 +1660,7 @@
                 const loader = new GLTFLoader();
                 loader.parse(e.target.result, '', (gltf) => {
                     const group = gltf.scene;
+                    
                     group.traverse((child) => { 
                         if (child.isMesh) { 
                             child.castShadow = true; child.receiveShadow = true; 
@@ -1562,7 +1684,7 @@
                         id: generateUniqueId(), 
                         group, 
                         name: uniqueName,
-                        rawBuffer: e.target.result // 👈 把文件的 ArrayBuffer 存入了记录
+                        rawBuffer: e.target.result 
                     };
                     loadedModels.push(modelRecord);
                     refreshModelBoneList(modelRecord);
@@ -1603,9 +1725,8 @@
             }
             controls.update();
 
-            // 🌟 实时物理引擎，保持原有动感
             activeParticleInstances.forEach(sys => {
-    sys.life += (1.0 / 30.0); // 👈 完美对齐 30 帧ys.life += 0.016;
+                sys.life += (1.0 / 30.0); 
                 
                 if (sys.mesh.material.userData.uvTime) {
                     sys.mesh.material.userData.uvTime.value = sys.life;
@@ -1719,7 +1840,6 @@
             });
             if (frame > lastMaxKeyframe) lastMaxKeyframe = frame;
 
-            // 🌟 自动扩展时间轴
             const currentRulerLength = document.querySelectorAll('.ruler-tick').length;
             if (frame >= currentRulerLength - 10) {
                 initTimeline();
@@ -1745,11 +1865,10 @@
 
         function initTimeline() {
             const ruler = document.getElementById('timeline-ruler');
-            // 🌟 彻底替换 maxFrames 为 1200 帧起步
             let framesToDraw = Math.max(1200, lastMaxKeyframe + 200); 
             if (framesToDraw > 6000) framesToDraw = 6000; 
 
-            ruler.innerHTML = ''; // 清空旧标尺
+            ruler.innerHTML = ''; 
             for (let i = 0; i <= framesToDraw; i++) {
                 const tick = document.createElement('div');
                 tick.className = 'ruler-tick' + (i % 5 === 0 ? ' major' : '');
@@ -1765,7 +1884,6 @@
                 ruler.appendChild(tick);
             }
             
-            // 🌟 联动修改时间轴轨道和底部的宽度
             const trackWidth = (framesToDraw + 1) * tickWidth;
             document.querySelectorAll('.track-lane').forEach(lane => {
                 lane.style.width = `${trackWidth}px`;
@@ -1786,7 +1904,7 @@
                 lanes.forEach(id => {
                     const kf = document.createElement('div'); 
                     kf.className = 'keyframe' + (data.interp === 'smooth' ? ' smooth-kf' : '');
-                    if (data.vfx && data.vfx.length > 0) kf.classList.add('has-vfx'); // 🌟 挂载特效的帧变成亮色
+                    if (data.vfx && data.vfx.length > 0) kf.classList.add('has-vfx'); 
                     kf.style.left = `${xPos}px`; 
                     kf.title = `帧 ${frame} | 插值: ${data.interp === 'smooth' ? '平滑(圆)' : '线性(菱)'}`;
                     kf.onclick = (e) => { e.stopPropagation(); currentFrame = frame; document.getElementById('val-current-frame').innerText = `当前帧: ${currentFrame}`; updatePlayhead(); applyAnimationState(currentFrame); };
@@ -1811,7 +1929,6 @@
         function showKfMenu(e, frame, data, isAudio) {
             activeKeyframeMenuData = { frame, data, isAudio };
             
-            // 🌟 长按判断：如果这一帧绑了粒子，就把循环和延迟同步显示出来
             if (data && data.vfx && data.vfx.length > 0) {
                 const vfx = data.vfx[0];
                 document.getElementById('chk-bind-loop').checked = vfx.loop !== false;
@@ -1861,7 +1978,6 @@
 
         function lerp(a, b, t) { return a + (b - a) * t; }
 
-        // 🌟 极简绑定按钮
         document.getElementById('btn-bind-vfx').onclick = () => {
             if (!selectedNode || !selectedNode.userData.isLocator) {
                 return alert("请先在右侧大纲中点击选中一个【📍定位器】！");
@@ -1892,9 +2008,9 @@
                 assetName: selectedVfxAsset.name,
                 offset: [0, 0, 0],
                 scale: [1, 1, 1],
-                loop: isLoop,       // 🌟 专属循环
-                delay: delayFrames, // 🌟 专属延迟
-                startFrame: currentFrame // 🌟 记录绑定帧
+                loop: isLoop,       
+                delay: delayFrames, 
+                startFrame: currentFrame 
             }];
 
             statusText.innerText = `✅ 绑定成功: [${selectedVfxAsset.name}] -> 帧 ${currentFrame} (延迟:${delayFrames}帧)`;
@@ -1922,7 +2038,6 @@
             const asset = loadedParticleAssets.find(a => a.name === vfxDesc.assetName);
             if (!asset) { console.warn('未找到粒子模板:', vfxDesc.assetName); return; }
 
-            // 🌟 延迟处理
             if (vfxDesc.delay && vfxDesc.delay > 0) {
                 setTimeout(() => {
                     if (!isPlaying && currentFrame < vfxDesc.startFrame) return; 
@@ -1940,10 +2055,8 @@
             instData.mesh.userData.isEventVfx = true; 
             instData.mesh.userData.vfxName = asset.name;
             instData.mesh.userData.parentLocName = locator.name;
-            // 🌟 读取专属循环标记
             instData.mesh.userData.shouldLoop = vfxDesc.loop !== false; 
 
-            const offset = vfxDesc.offset || [0, 0, 0];
             const scl = vfxDesc.scale || [1, 1, 1];
 
             const worldPos = new THREE.Vector3();
@@ -2454,7 +2567,6 @@
             document.getElementById('render-text').innerText = '正在初始化 MP4 编码器...';
             document.getElementById('btn-cancel-render').onclick = () => { cancelRender = true; };
 
-            // 🌟 关键修复：这里必须设为 true，否则绑定定位器的粒子根本不会生成！
             isPlaying = true; 
             isRenderingVideo = true; cancelRender = false;
 
@@ -2482,10 +2594,8 @@
                     document.getElementById('render-bar').style.width = `${progress}%`;
                     document.getElementById('render-text').innerText = `正在渲染并压缩: ${frame} / ${totalFrames}`;
 
-                    // applyAnimationState 会因为在播放状态，去触发 triggerLocatorVfx 生成粒子！
                     applyAnimationState(animFrame);
 
-                    // 🌟 修复：导出时同步推进天气系统（雨/雪），防止暂停
                     if (globalWeatherSystem) {
                         const wsys = globalWeatherSystem;
                         const wpos = wsys.mesh.geometry.attributes.position.array;
@@ -2511,31 +2621,26 @@
                         wsys.mesh.geometry.attributes.position.needsUpdate = true;
                     }
 
-                    // 🌟 核心修复：导出时强制手动更新粒子，防止暂停
-activeParticleInstances.forEach(sys => {
-    
-    // 👇 新增这一段：不在绑定的时间段内就隐藏，防止无限循环！
-    if (sys.mesh && sys.mesh.userData.isEventVfx) {
-        let isTimeToShow = false;
-        const locName = sys.mesh.userData.parentLocName;
-        if (locName) {
-            const key = `locator_${locName}`;
-            if (animationData.has(key)) {
-                const nodeData = animationData.get(key);
-                const fd = nodeData.get(animFrame); 
-                // 检查当前帧是否挂载了这个粒子
-                if (fd && fd.vfx && fd.vfx.some(v => v.assetName === sys.mesh.userData.vfxName)) {
-                    isTimeToShow = true;
-                }
-            }
-        }
-        if (!isTimeToShow) {
-            sys.mesh.visible = false;
-        }
-    }
-    // 👆 新增结束
+                    activeParticleInstances.forEach(sys => {
+                        if (sys.mesh && sys.mesh.userData.isEventVfx) {
+                            let isTimeToShow = false;
+                            const locName = sys.mesh.userData.parentLocName;
+                            if (locName) {
+                                const key = `locator_${locName}`;
+                                if (animationData.has(key)) {
+                                    const nodeData = animationData.get(key);
+                                    const fd = nodeData.get(animFrame); 
+                                    if (fd && fd.vfx && fd.vfx.some(v => v.assetName === sys.mesh.userData.vfxName)) {
+                                        isTimeToShow = true;
+                                    }
+                                }
+                            }
+                            if (!isTimeToShow) {
+                                sys.mesh.visible = false;
+                            }
+                        }
 
-    sys.life += (1.0 / fps);
+                        sys.life += (1.0 / fps);
 
                         const positions = sys.mesh.geometry.attributes.position.array;
                         const colors = sys.mesh.geometry.attributes.color.array;
