@@ -1160,16 +1160,65 @@
         }
 
         function buildTextureList() {
-            const container = document.getElementById('texture-view'); container.innerHTML = '';
-            if (textureRegistry.size === 0) { container.innerHTML = '<span style="color:#555;">当前场景没有可编辑的贴图</span>'; return; }
-            textureRegistry.forEach((data, uuid) => {
-                const div = document.createElement('div'); div.className = 'list-item';
-                const img = document.createElement('img'); img.src = data.texture.image ? (data.texture.image.src || '') : ''; img.style.width = '24px'; img.style.height = '24px'; img.style.objectFit = 'cover'; img.style.marginRight = '8px'; img.style.borderRadius = '3px'; div.appendChild(img);
-                const text = document.createElement('span'); text.innerText = data.name; text.style.flex = '1'; text.style.overflow = 'hidden'; text.style.textOverflow = 'ellipsis'; div.appendChild(text);
-                let pressTimer; div.onmousedown = div.ontouchstart = () => { pressTimer = setTimeout(() => openTextureEditor(uuid), 600); }; div.onmouseup = div.ontouchend = div.onmouseleave = () => clearTimeout(pressTimer);
-                container.appendChild(div);
-            });
+    const container = document.getElementById('texture-view'); container.innerHTML = '';
+    if (textureRegistry.size === 0) { container.innerHTML = '<span style="color:#555;">当前场景没有可编辑的贴图</span>'; return; }
+    
+    textureRegistry.forEach((data, uuid) => {
+        const div = document.createElement('div'); div.className = 'list-item';
+        const img = document.createElement('img'); 
+        
+        // 统一设置图标尺寸和样式
+        img.style.width = '24px'; 
+        img.style.height = '24px'; 
+        img.style.objectFit = 'cover'; 
+        img.style.marginRight = '8px'; 
+        img.style.borderRadius = '3px'; 
+        img.style.backgroundColor = '#222'; 
+
+        // 🌟 生成超小缩略图，彻底解决大图卡顿和撑爆 UI 的问题
+        if (data.texture.image) {
+            const srcImage = data.texture.image;
+            
+            if (srcImage instanceof HTMLCanvasElement || srcImage instanceof ImageBitmap) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 48; canvas.height = 48;
+                canvas.getContext('2d').drawImage(srcImage, 0, 0, 48, 48);
+                img.src = canvas.toDataURL('image/jpeg', 0.8);
+            } 
+            else if (srcImage instanceof HTMLImageElement) {
+                if (srcImage.complete && srcImage.naturalWidth > 0) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 48; canvas.height = 48;
+                    canvas.getContext('2d').drawImage(srcImage, 0, 0, 48, 48);
+                    img.src = canvas.toDataURL('image/jpeg', 0.8);
+                } else {
+                    img.src = srcImage.src;
+                    img.onload = () => {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = 48; canvas.height = 48;
+                            canvas.getContext('2d').drawImage(srcImage, 0, 0, 48, 48);
+                            img.src = canvas.toDataURL('image/jpeg', 0.8);
+                        } catch (e) { /* 忽略跨域错误 */ }
+                    };
+                }
+            } 
+            else if (srcImage.src) {
+                img.src = srcImage.src;
+            }
         }
+        
+        div.appendChild(img);
+        
+        const text = document.createElement('span'); text.innerText = data.name; text.style.flex = '1'; text.style.overflow = 'hidden'; text.style.textOverflow = 'ellipsis'; div.appendChild(text);
+        
+        let pressTimer; 
+        div.onmousedown = div.ontouchstart = () => { pressTimer = setTimeout(() => openTextureEditor(uuid), 600); }; 
+        div.onmouseup = div.ontouchend = div.onmouseleave = () => clearTimeout(pressTimer);
+        
+        container.appendChild(div);
+    });
+}
 
         function openTextureEditor(uuid) {
             const data = textureRegistry.get(uuid); if (!data) return;
