@@ -231,11 +231,9 @@
                 <div class="btn-group" style="margin-bottom:8px;">
                     <button class="mode-btn" id="btn-add-kf" style="background:#0055aa; padding:12px 0; font-size:14px;">➕ 记录当前骨骼/摄像机关键帧</button>
                 </div>
-                <!-- 🌟 极简绑定按钮 -->
                 <div class="btn-group" style="margin-bottom:8px;">
                     <button class="mode-btn" id="btn-bind-vfx" style="background:#9c27b0; padding:12px 0; font-size:14px; font-weight:bold; color:white;">☄️ 在当前帧绑定选中粒子</button>
                 </div>
-                <!-- 🌟 新增的循环与延迟控制面板 -->
                 <div class="control-group" style="background:#1a1a1a; padding:8px; border-radius:4px; border:1px solid #444; margin-bottom:8px;">
                     <div style="display:flex; align-items:center; gap:5px; margin-bottom:5px;">
                         <input type="checkbox" id="chk-bind-loop" checked style="cursor:pointer; width:14px; height:14px;">
@@ -846,12 +844,20 @@
         });
 
         document.getElementById('slider-part-size').addEventListener('input', (e) => {
-            particleSize = parseFloat(e.target.value);
-            document.getElementById('val-part-size').innerText = particleSize;
-            activeParticleInstances.forEach(inst => {
-                if(inst.mesh) inst.mesh.material.size = particleSize * 10;
-            });
-        });
+    const newSize = parseFloat(e.target.value);
+    particleSize = newSize; // 依然记录全局默认值，供新生成的粒子使用
+    document.getElementById('val-part-size').innerText = newSize;
+
+    // 🌟 只有在右侧大纲选中了某个具体的特效时，才实时生效
+    if (selectedNode && selectedNode.userData.isVfxMesh) {
+        // 使用你之前存好的基准倍率（如果没有，就默认按 10 兜底）
+        const baseMultiplier = selectedNode.userData.baseSizeMultiplier || 10;
+        selectedNode.material.size = newSize * baseMultiplier; 
+        statusText.innerText = `🎯 已调整选中特效大小: ${newSize}`;
+    } else {
+        statusText.innerText = `🌍 已设置全局默认粒子大小: ${newSize}`;
+    }
+});
 
         document.getElementById('slider-part-trail').addEventListener('input', (e) => {
             particleTrail = parseFloat(e.target.value);
@@ -872,26 +878,38 @@
             
             const colStart = new THREE.Color(config.colorStart || "#ffffff");
             const colEnd = new THREE.Color(config.colorEnd || "#ffffff");
-            const speed = config.physics?.speed || 5.0;
-            const spread = config.physics?.spread || 1.0;
+            const speed = config.physics?.speed || 0;
+            const spread = config.physics?.spread || 0;
             const isExplode = config.explode || false;
+            const emitterShape = config.emitterShape || "point";
 
             for (let i = 0; i < count; i++) {
-                positions[i * 3] = 0; positions[i * 3 + 1] = 0; positions[i * 3 + 2] = 0;
-
-                if (isExplode) {
-                    velocities.push(new THREE.Vector3(
-                        (Math.random() - 0.5) * speed * 2,
-                        (Math.random() - 0.5) * speed * 2,
-                        (Math.random() - 0.5) * speed * 2
-                    ));
+                // 🌟 核心修改：判断生成形状
+                if (emitterShape === "sphere") {
+                    const radius = config.shapeRadius || 1.0;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos((Math.random() * 2) - 1);
+                    positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+                    positions[i * 3 + 1] = radius * Math.cos(phi);
+                    positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+                    
+                    velocities.push(new THREE.Vector3(0,0,0)); // 球形模式下强制速度为0，免去物理计算
                 } else {
-                    const angle = Math.random() * Math.PI * 2;
-                    velocities.push(new THREE.Vector3(
-                        Math.cos(angle) * Math.random() * spread,
-                        Math.random() * speed,
-                        Math.sin(angle) * Math.random() * spread
-                    ));
+                    positions[i * 3] = 0; positions[i * 3 + 1] = 0; positions[i * 3 + 2] = 0;
+                    if (isExplode) {
+                        velocities.push(new THREE.Vector3(
+                            (Math.random() - 0.5) * speed * 2,
+                            (Math.random() - 0.5) * speed * 2,
+                            (Math.random() - 0.5) * speed * 2
+                        ));
+                    } else {
+                        const angle = Math.random() * Math.PI * 2;
+                        velocities.push(new THREE.Vector3(
+                            Math.cos(angle) * Math.random() * spread,
+                            Math.random() * speed,
+                            Math.sin(angle) * Math.random() * spread
+                        ));
+                    }
                 }
                 colors[i * 3] = colStart.r; colors[i * 3 + 1] = colStart.g; colors[i * 3 + 2] = colStart.b;
             }
@@ -902,8 +920,10 @@
             let blendMode = THREE.AdditiveBlending;
             if (config.renderMode === "normal" || config.renderMode === "blend") blendMode = THREE.NormalBlending;
 
+            // 🌟 核心修复：将 config.size 作为独立倍数接入
+            const sizeMultiplier = (config.size !== undefined) ? (config.size * 10) : 10;
             const material = new THREE.PointsMaterial({
-                size: particleSize * 10, 
+                size: particleSize * sizeMultiplier,
                 sizeAttenuation: false,  
                 map: texture || defaultDotTex,
                 vertexColors: true,
@@ -966,6 +986,7 @@
             };
 
             const mesh = new THREE.Points(geometry, material);
+            mesh.userData.baseSizeMultiplier = sizeMultiplier; // 存入 Mesh 以防止滑块调节时被覆盖
             
             return { 
                 mesh, velocities, life: 0, maxLife: config.lifetime || 2.0, 
@@ -974,8 +995,8 @@
                 gravity: config.physics?.gravity !== undefined ? config.physics.gravity : particleGravity,
                 colStart: colStart, colEnd: colEnd,
                 assetName: config.name || "未知特效",
-                originalSpeed: config.physics?.speed || 5.0,   
-                originalSpread: config.physics?.spread || 1.0
+                originalSpeed: config.physics?.speed || 0,   
+                originalSpread: config.physics?.spread || 0
             };
         }
 
@@ -1160,65 +1181,57 @@
         }
 
         function buildTextureList() {
-    const container = document.getElementById('texture-view'); container.innerHTML = '';
-    if (textureRegistry.size === 0) { container.innerHTML = '<span style="color:#555;">当前场景没有可编辑的贴图</span>'; return; }
-    
-    textureRegistry.forEach((data, uuid) => {
-        const div = document.createElement('div'); div.className = 'list-item';
-        const img = document.createElement('img'); 
-        
-        // 统一设置图标尺寸和样式
-        img.style.width = '24px'; 
-        img.style.height = '24px'; 
-        img.style.objectFit = 'cover'; 
-        img.style.marginRight = '8px'; 
-        img.style.borderRadius = '3px'; 
-        img.style.backgroundColor = '#222'; 
-
-        // 🌟 生成超小缩略图，彻底解决大图卡顿和撑爆 UI 的问题
-        if (data.texture.image) {
-            const srcImage = data.texture.image;
+            const container = document.getElementById('texture-view'); container.innerHTML = '';
+            if (textureRegistry.size === 0) { container.innerHTML = '<span style="color:#555;">当前场景没有可编辑的贴图</span>'; return; }
             
-            if (srcImage instanceof HTMLCanvasElement || srcImage instanceof ImageBitmap) {
-                const canvas = document.createElement('canvas');
-                canvas.width = 48; canvas.height = 48;
-                canvas.getContext('2d').drawImage(srcImage, 0, 0, 48, 48);
-                img.src = canvas.toDataURL('image/jpeg', 0.8);
-            } 
-            else if (srcImage instanceof HTMLImageElement) {
-                if (srcImage.complete && srcImage.naturalWidth > 0) {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 48; canvas.height = 48;
-                    canvas.getContext('2d').drawImage(srcImage, 0, 0, 48, 48);
-                    img.src = canvas.toDataURL('image/jpeg', 0.8);
-                } else {
-                    img.src = srcImage.src;
-                    img.onload = () => {
-                        try {
+            textureRegistry.forEach((data, uuid) => {
+                const div = document.createElement('div'); div.className = 'list-item';
+                const img = document.createElement('img'); 
+                
+                img.style.width = '24px'; img.style.height = '24px'; img.style.objectFit = 'cover'; img.style.marginRight = '8px'; img.style.borderRadius = '3px'; img.style.backgroundColor = '#222'; 
+
+                if (data.texture.image) {
+                    const srcImage = data.texture.image;
+                    if (srcImage instanceof HTMLCanvasElement || srcImage instanceof ImageBitmap) {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 48; canvas.height = 48;
+                        canvas.getContext('2d').drawImage(srcImage, 0, 0, 48, 48);
+                        img.src = canvas.toDataURL('image/jpeg', 0.8);
+                    } 
+                    else if (srcImage instanceof HTMLImageElement) {
+                        if (srcImage.complete && srcImage.naturalWidth > 0) {
                             const canvas = document.createElement('canvas');
                             canvas.width = 48; canvas.height = 48;
                             canvas.getContext('2d').drawImage(srcImage, 0, 0, 48, 48);
                             img.src = canvas.toDataURL('image/jpeg', 0.8);
-                        } catch (e) { /* 忽略跨域错误 */ }
-                    };
+                        } else {
+                            img.src = srcImage.src;
+                            img.onload = () => {
+                                try {
+                                    const canvas = document.createElement('canvas');
+                                    canvas.width = 48; canvas.height = 48;
+                                    canvas.getContext('2d').drawImage(srcImage, 0, 0, 48, 48);
+                                    img.src = canvas.toDataURL('image/jpeg', 0.8);
+                                } catch (e) { /* 忽略跨域错误 */ }
+                            };
+                        }
+                    } 
+                    else if (srcImage.src) {
+                        img.src = srcImage.src;
+                    }
                 }
-            } 
-            else if (srcImage.src) {
-                img.src = srcImage.src;
-            }
+                
+                div.appendChild(img);
+                
+                const text = document.createElement('span'); text.innerText = data.name; text.style.flex = '1'; text.style.overflow = 'hidden'; text.style.textOverflow = 'ellipsis'; div.appendChild(text);
+                
+                let pressTimer; 
+                div.onmousedown = div.ontouchstart = () => { pressTimer = setTimeout(() => openTextureEditor(uuid), 600); }; 
+                div.onmouseup = div.ontouchend = div.onmouseleave = () => clearTimeout(pressTimer);
+                
+                container.appendChild(div);
+            });
         }
-        
-        div.appendChild(img);
-        
-        const text = document.createElement('span'); text.innerText = data.name; text.style.flex = '1'; text.style.overflow = 'hidden'; text.style.textOverflow = 'ellipsis'; div.appendChild(text);
-        
-        let pressTimer; 
-        div.onmousedown = div.ontouchstart = () => { pressTimer = setTimeout(() => openTextureEditor(uuid), 600); }; 
-        div.onmouseup = div.ontouchend = div.onmouseleave = () => clearTimeout(pressTimer);
-        
-        container.appendChild(div);
-    });
-}
 
         function openTextureEditor(uuid) {
             const data = textureRegistry.get(uuid); if (!data) return;
@@ -2353,6 +2366,13 @@
                 lastMaxKeyframe = projectData.lastMaxKeyframe; 
                 currentFrame = projectData.currentFrame;
                 updatePlayhead();
+
+                // 清空旧粒子和旧模型，避免重复导入翻倍
+                activeParticleInstances.forEach(inst => {
+                    if (inst.mesh.parent) inst.mesh.parent.remove(inst.mesh);
+                    inst.mesh.geometry.dispose(); inst.mesh.material.dispose();
+                });
+                activeParticleInstances = []; loadedParticleAssets = []; activeLocatorVfx = [];
 
                 if (projectData.models && projectData.models.length > 0) {
                     const loader = new GLTFLoader();
